@@ -40,7 +40,7 @@ router.post('/', async (req, res) => {
 
     // создаем пользователя
     const user = await pool.query(
-      `INSERT INTO users (lastname, firstname, email, account_id) VALUES ($1,$2,$3,$4) RETURNING *`,
+      `INSERT INTO users (lastname, firstname, patronymic, email, account_id) VALUES ($1,$2,$3,$4) RETURNING *`,
       [lastname, firstname, email, effectiveAccountId]
     );
 

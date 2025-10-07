@@ -69,4 +69,56 @@ router.delete('/:id', async (req, res) => {
 	}
 });
 
+// вход (авторизация)
+router.post('/login', async (req, res) => {
+    try {
+        const { login, password } = req.body;
+        if (!login || !password) {
+            return res.status(400).json({ error: 'Логин и пароль обязательны' });
+        }
+
+        // Проверяем логин/пароль через crypt
+        const result = await pool.query(
+            `SELECT a.id_account, a.login, a.role_id, r.rolename
+             FROM accounts a
+             JOIN roles r ON a.role_id = r.id_role
+             WHERE a.login=$1 AND (
+               (a.hashpassword LIKE '$%' AND a.hashpassword = crypt($2, a.hashpassword))
+               OR
+               (a.hashpassword NOT LIKE '$%' AND a.hashpassword = $2)
+             )`,
+            [login, password]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(401).json({ error: 'Неверный логин или пароль' });
+        }
+
+        const account = result.rows[0];
+
+        // Дополнительно получим информацию о пользователе по account_id (если есть)
+        const userQuery = await pool.query(
+            `SELECT id_user, lastname, firstname, email
+             FROM users
+             WHERE account_id = $1`,
+            [account.id_account]
+        );
+
+        const user = userQuery.rows[0] || null;
+
+        // Возвращаем простую сессию без JWT (можно расширить позже)
+        res.json({
+            account: {
+                id_account: account.id_account,
+                login: account.login,
+                role_id: account.role_id,
+                rolename: account.rolename
+            },
+            user
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 export default router; 

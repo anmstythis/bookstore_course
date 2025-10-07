@@ -153,12 +153,14 @@ INSERT INTO Statuses (Status) VALUES
 
 -- Авторы
 INSERT INTO Authors (Lastname, Firstname, Patronymic, BirthDate, DeathDate) VALUES
+('Волков', 'Александр', 'Мелентьевич', '1891-06-14', '1977-07-03')
 ('Пушкин', 'Александр', 'Сергеевич', '1799-06-06', '1837-01-29'),
 ('Толстой', 'Лев', 'Николаевич', '1828-09-09', '1910-11-20'),
 ('Достоевский', 'Фёдор', 'Михайлович', '1821-11-11', '1881-02-09');
 
 -- Категории
 INSERT INTO Categories (Name) VALUES
+('Повесть')
 ('Роман'),
 ('Поэзия'),
 ('Фантастика');
@@ -170,9 +172,12 @@ INSERT INTO Publishers (LegalName, ContactNum, Email, Address_ID) VALUES
 
 -- Книги
 INSERT INTO Books (Title, Description, PublishDate, Author_ID, Publisher_ID, Category_ID, Price, Quantity, ImageURL) VALUES
+('Преступление и наказание', 'Роман', '1866-01-01', 3, 1, 1, 800.00, 15, 'https://cdn.ast.ru/v2/ASE000000000703427/COVER/cover1__w410.jpg'),
+('Волшебник изумрудного города', 'Сказочная повесть «Волшебник Изумрудного города» является переработкой сказки американского писателя Ф. Баума. Она рассказывает об удивительных приключениях девочки Элли и ее друзей в Волшебной стране.', null, 4, 1, 4, 1499.00, 5, 'https://cdn.ast.ru/v2/AST000000000153536/COVER/cover1__w410.jpg')
 ('Евгений Онегин', 'Роман в стихах', '1833-01-01', 1, 1, 2, 350.00, 10, 'img/onegin.jpg'),
-('Война и мир', 'Эпопея', '1869-01-01', 2, 2, 1, 1200.00, 5, 'img/warpeace.jpg'),
-('Преступление и наказание', 'Роман', '1866-01-01', 3, 1, 1, 800.00, 7, 'img/crime.jpg');
+('Война и мир', 'Эпопея', '1869-01-01', 2, 2, 1, 1200.00, 5, 'img/warpeace.jpg');
+
+update 
 
 -- Заказы
 INSERT INTO Orders (OrderDate, User_ID, Status_ID, DeliveryType_ID, Address_ID) VALUES
@@ -214,7 +219,7 @@ CREATE OR REPLACE VIEW BooksView AS
 SELECT 
     b.ID_Book AS "Код книги",
     b.Title AS "Название",
-    a.Lastname || ' ' || a.Firstname AS "Автор",
+    a.Firstname || ' ' || a.Lastname AS "Автор",
     c.Name AS "Категория",
     p.LegalName AS "Издатель",
     b.Price AS "Цена",
@@ -235,7 +240,7 @@ LEFT JOIN Reviews r ON b.ID_Book = r.Book_ID
 GROUP BY b.Title
 ORDER BY "Средняя оценка" DESC, "Кол-во отзывов" DESC;
 
--- Подробности заказа (связь заказов с книгами)
+-- Подробности заказа
 CREATE OR REPLACE VIEW OrderDetailsView AS
 SELECT 
     od.ID_OrderDetail AS "Код детали",
@@ -267,3 +272,171 @@ SELECT *FROM BooksView
 SELECT *FROM TopBooksView
 SELECT *FROM OrderDetailsView
 SELECT *FROM UsersAccountsView
+
+--ФУНКЦИИ
+--топ книг за определенный период
+CREATE OR REPLACE FUNCTION get_top_books_period(p_days INT, p_limit INT)
+RETURNS TABLE (
+    book_id INT,
+    title VARCHAR,
+    total_sold BIGINT
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT b.id_book,
+           b.title,
+           SUM(od.quantity) AS total_sold
+    FROM orderdetails od
+    JOIN orders o ON od.order_id = o.id_order
+    JOIN books b ON od.book_id = b.id_book
+    WHERE o.orderdate >= NOW() - (p_days || ' days')::INTERVAL
+    GROUP BY b.id_book, b.title
+    ORDER BY total_sold DESC
+    LIMIT p_limit;
+END;
+$$ LANGUAGE plpgsql;
+
+--средний чек пользователя за период
+CREATE OR REPLACE FUNCTION get_user_avg_check_period(p_user_id INT, p_days INT)
+RETURNS NUMERIC AS $$
+DECLARE
+    avg_check NUMERIC;
+BEGIN
+    SELECT AVG(sum_order) INTO avg_check
+    FROM (
+        SELECT SUM(od.price * od.quantity) AS sum_order
+        FROM orders o
+        JOIN orderdetails od ON o.id_order = od.order_id
+        WHERE o.user_id = p_user_id
+          AND o.orderdate >= NOW() - (p_days || ' days')::INTERVAL
+        GROUP BY o.id_order
+    ) sub;
+
+    RETURN COALESCE(avg_check, 0);
+END;
+$$ LANGUAGE plpgsql;
+
+--доход за период
+CREATE OR REPLACE FUNCTION get_income_period(p_days INT)
+RETURNS NUMERIC AS $$
+DECLARE
+    total_income NUMERIC;
+BEGIN
+    SELECT SUM(od.price * od.quantity) INTO total_income
+    FROM orders o
+    JOIN orderdetails od ON o.id_order = od.order_id
+    WHERE o.orderdate >= NOW() - (p_days || ' days')::INTERVAL;
+
+    RETURN COALESCE(total_income, 0);
+END;
+$$ LANGUAGE plpgsql;
+
+--топ пользователей по сумме покупок за период
+CREATE OR REPLACE FUNCTION get_top_users_period(p_days INT, p_limit INT)
+RETURNS TABLE (
+    user_id INT,
+    fullname VARCHAR,
+    total_spent NUMERIC
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT u.id_user,
+           (u.lastname || ' ' || u.firstname)::VARCHAR,
+           SUM(od.price * od.quantity) AS total_spent
+    FROM users u
+    JOIN orders o ON u.id_user = o.user_id
+    JOIN orderdetails od ON o.id_order = od.order_id
+    WHERE o.orderdate >= NOW() - (p_days || ' days')::INTERVAL
+    GROUP BY u.id_user, u.lastname, u.firstname
+    ORDER BY total_spent DESC
+    LIMIT p_limit;
+END;
+$$ LANGUAGE plpgsql;
+
+
+--ПРОВЕРКА ФУНКЦИЙ
+SELECT * FROM get_top_books_period(30, 5);  -- топ-5 книг за 30 дней
+SELECT get_user_avg_check_period(2, 90);  -- средний чек пользователя с id 2 за 30 дней
+SELECT get_income_period(30);  -- доход за последние 30 дней
+SELECT * FROM get_top_users_period(30, 3);  -- топ-3 покупателей за месяц
+
+--ТРИГГЕРЫ
+--автоматическое уменьшение количества книг
+CREATE OR REPLACE FUNCTION reduce_book_quantity()
+RETURNS TRIGGER AS $$
+BEGIN
+    UPDATE books
+    SET quantity = quantity - NEW.quantity
+    WHERE id_book = NEW.book_id;
+
+    IF (SELECT quantity FROM books WHERE id_book = NEW.book_id) < 0 THEN
+        RAISE EXCEPTION 'Недостаточно книг на складе (book_id = %)', NEW.book_id;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_reduce_book_quantity
+AFTER INSERT ON orderdetails
+FOR EACH ROW
+EXECUTE FUNCTION reduce_book_quantity();
+
+--проверка номера телефона
+CREATE OR REPLACE FUNCTION check_publisher_phone()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.contactnum !~ '^[0-9]+$' THEN
+        RAISE EXCEPTION 'Номер телефона должен содержать только цифры';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_check_publisher_phone
+BEFORE INSERT OR UPDATE ON publishers
+FOR EACH ROW
+EXECUTE FUNCTION check_publisher_phone();
+
+--автоматическая установка заказа на "новый"
+CREATE OR REPLACE FUNCTION set_default_order_status()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.status_id IS NULL THEN
+        NEW.status_id := (SELECT id_status FROM statuses WHERE status = 'Новый' LIMIT 1);
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_set_default_order_status
+BEFORE INSERT ON orders
+FOR EACH ROW
+EXECUTE FUNCTION set_default_order_status();
+
+-- проверка email
+CREATE OR REPLACE FUNCTION check_email_trigger()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.email NOT LIKE '%@%' THEN
+        RAISE EXCEPTION 'Некорректный email: должен содержать символ @';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_check_email
+BEFORE INSERT OR UPDATE ON Users
+FOR EACH ROW
+EXECUTE FUNCTION check_email_trigger();
+
+--ПРОВЕРКА ТРИГГЕРОВ
+UPDATE Users
+SET Email = 'mail.com'
+WHERE id_user = 1; --проверка email
+
+UPDATE Publishers 
+SET ContactNum = '8q95h234K67'
+WHERE id_publisher = 1; --проверка номера телефона
+
+
