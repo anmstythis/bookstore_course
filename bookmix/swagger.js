@@ -10,6 +10,14 @@ export default {
 	],
 	components: {
 		schemas: {
+			securitySchemes: {
+				bearerAuth: {
+					type: 'http',
+					scheme: 'bearer',
+					bearerFormat: 'JWT',
+					description: 'Введите токен в формате: Bearer <token>'
+				}
+			},
 			Book: {
 				type: 'object',
 				properties: {
@@ -63,10 +71,103 @@ export default {
 			},
 			Order: { type: 'object', properties: { id_order: { type: 'integer' } } },
 			OrderDetail: { type: 'object', properties: { id_orderdetail: { type: 'integer' }, order_id: { type: 'integer' }, price: { type: 'number' }, quantity: { type: 'integer' }, book_id: { type: 'integer' } } },
-			Review: { type: 'object', properties: { id_review: { type: 'integer' }, rating: { type: 'integer' }, usercomment: { type: 'string' }, reviewdate: { type: 'string', format: 'date-time' } } }
+			Review: { type: 'object', properties: { id_review: { type: 'integer' }, rating: { type: 'integer' }, usercomment: { type: 'string' }, reviewdate: { type: 'string', format: 'date-time' } } },
+			RegisterRequest: {
+				type: 'object',
+				properties: {
+					lastname: { type: 'string' },
+					firstname: { type: 'string' },
+					patronymic: { type: 'string' },
+					email: { type: 'string' },
+					role_id: {type: 'integer'},
+					login: { type: 'string' },
+					password: { type: 'string'},
+				},
+				required: ['lastname', 'firstname', 'email', 'login', 'password']
+			},
+			LoginRequest: {
+				type: 'object',
+				properties: {
+					login: { type: 'string' },
+					password: { type: 'string' }
+				},
+				required: ['login', 'password']
+			},
+			LoginResponse: {
+				type: 'object',
+				properties: {
+					token: { type: 'string' },
+					user: {
+						type: 'object',
+						properties: {
+							id: { type: 'integer' },
+							firstname: { type: 'string' },
+							lastname: { type: 'string' },
+							role: { type: 'string' }
+						}
+					}
+				}
+			}
+		
 		}
 	},
+
+	security: [
+		{ bearerAuth: [] }
+	],
+
 	paths: {
+		'/api/auth/register': {
+			post: {
+				summary: 'Регистрация нового пользователя',
+				tags: ['Auth'],
+				security: [], // не требует токена
+				requestBody: {
+					required: true,
+					content: {
+						'application/json': {
+							schema: { $ref: '#/components/schemas/RegisterRequest' }
+						}
+					}
+				},
+				responses: {
+					201: {
+						description: 'Пользователь успешно создан'
+					},
+					400: {
+						description: 'Ошибка при регистрации (например, логин занят)'
+					}
+				}
+			}
+		},
+		'/api/auth/login': {
+			post: {
+				summary: 'Авторизация пользователя',
+				tags: ['Auth'],
+				security: [], // не требует токена
+				requestBody: {
+					required: true,
+					content: {
+						'application/json': {
+							schema: { $ref: '#/components/schemas/LoginRequest' }
+						}
+					}
+				},
+				responses: {
+					200: {
+						description: 'Успешный вход, возвращает JWT токен',
+						content: {
+							'application/json': {
+								schema: { $ref: '#/components/schemas/LoginResponse' }
+							}
+						}
+					},
+					401: {
+						description: 'Неверный логин или пароль'
+					}
+				}
+			}
+		},
 		'/api/books': {
 			get: {
 				summary: 'Получить все книги',
@@ -115,7 +216,6 @@ export default {
 		'/api/roles/{id}': { get: { summary: 'Роль по id', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }], responses: { '200': { description: 'OK' }, '404': { description: 'Not Found' } } }, put: { summary: 'Обновить роль', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }], requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/Role' } } } }, responses: { '200': { description: 'OK' } } }, delete: { summary: 'Удалить роль', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }], responses: { '200': { description: 'Deleted' } } } },
 		'/api/accounts': { get: { summary: 'Все аккаунты', responses: { '200': { description: 'OK' } } }, post: { summary: 'Создать аккаунт', requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', properties: { login: { type: 'string' }, password: { type: 'string' }, role_id: { type: 'integer' } }, required: ['login','password','role_id'] } } } }, responses: { '201': { description: 'Created' } } } },
 		'/api/accounts/{id}': { get: { summary: 'Аккаунт по id', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }], responses: { '200': { description: 'OK' }, '404': { description: 'Not Found' } } }, delete: { summary: 'Удалить аккаунт', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }], responses: { '200': { description: 'Deleted' } } } },
-		'/api/accounts/{id}/role': { put: { summary: 'Обновить роль аккаунта', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', properties: { role_id: { type: 'integer' } }, required: ['role_id'] } } } }, responses: { '200': { description: 'OK' } } } },
 		'/api/addresses': { get: { summary: 'Все адреса', responses: { '200': { description: 'OK' } } }, post: { summary: 'Создать адрес', requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/Address' } } } }, responses: { '201': { description: 'Created' } } } },
 		'/api/addresses/{id}': { get: { summary: 'Адрес по id', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }], responses: { '200': { description: 'OK' }, '404': { description: 'Not Found' } } }, put: { summary: 'Обновить адрес', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }], requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/Address' } } } }, responses: { '200': { description: 'OK' } } }, delete: { summary: 'Удалить адрес', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }], responses: { '200': { description: 'Deleted' } } } },
 		'/api/authors': { get: { summary: 'Все авторы', responses: { '200': { description: 'OK' } } }, post: { summary: 'Создать автора', requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/Author' } } } }, responses: { '201': { description: 'Created' } } } },

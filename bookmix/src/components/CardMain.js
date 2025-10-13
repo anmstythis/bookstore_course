@@ -6,69 +6,91 @@ const Card = ({ head, term, route }) => {
   const [data, setData] = useState([]);
 
   useEffect(() => {
-    axios.get('http://localhost:5000/api/books')
-      .then(res => {
-        const mapped = res.data.map(row => ({
+  const fetchData = async () => {
+    try {
+      const [booksRes, authorsRes] = await Promise.all([
+        axios.get('http://localhost:5000/api/books'),
+        axios.get('http://localhost:5000/api/authors')
+      ]);
+
+      const authors = authorsRes.data || [];
+
+      const mapped = (booksRes.data || []).map(row => {
+        const author = authors.find(a => a.id_author === row.author_id);
+
+        return {
           id: row.id_book,
           name: row.title,
-          author: row.author,
+          authorId: row.author_id,
+          author: author ? `${author.firstname} ${author.lastname}` : 'Неизвестный автор',
           price: Number(row.price),
           url: row.imageurl,
-          genre: row.category,
+          categoryId: row.category_id,
           addedToCart: false,
           addedAmount: 0,
           isFavorite: false
-        }));
-        setData(mapped);
-      })
-      .catch(err => console.log(err));
-  }, []);
+        };
+      });
 
-  const addToCart = (id) => {
-    const current = data.find(item => item.id === id);
-    if (!current) return;
-    const updated = {
-      ...current,
-      addedToCart: true,
-      addedAmount: (current.addedAmount || 0) + 1
-    };
-    setData(data.map(item => item.id === id ? updated : item));
+      setData(mapped);
+      console.log("Полученные книги:", mapped);
+    } catch (err) {
+      console.error("Ошибка при загрузке данных:", err);
+    }
   };
 
-  const becomeFavorite = (id) => {
-    const current = data.find(item => item.id === id);
-    if (!current) return;
-    const updated = { ...current, isFavorite: !current.isFavorite };
-    setData(data.map(item => item.id === id ? updated : item));
+  fetchData();
+}, []);
+
+
+  const addToCart = (id) => {
+    setData(prev => prev.map(item =>
+      item.id === id
+        ? { ...item, addedToCart: true, addedAmount: item.addedAmount + 1 }
+        : item
+    ));
   };
 
   const removeFromCart = (id) => {
-    const current = data.find(item => item.id === id);
-    if (!current) return;
-    let updatedAmount = (current.addedAmount || 0) - 1;
-    if (updatedAmount < 0) updatedAmount = 0;
-    const updated = {
-      ...current,
-      addedAmount: updatedAmount,
-      addedToCart: updatedAmount > 0
-    };
-    setData(data.map(item => item.id === id ? updated : item));
+    setData(prev => prev.map(item =>
+      item.id === id
+        ? {
+            ...item,
+            addedAmount: Math.max(item.addedAmount - 1, 0),
+            addedToCart: item.addedAmount - 1 > 0
+          }
+        : item
+    ));
   };
+
+  const becomeFavorite = (id) => {
+    setData(prev => prev.map(item =>
+      item.id === id ? { ...item, isFavorite: !item.isFavorite } : item
+    ));
+  };
+
+  const filteredData = typeof term === 'function' ? data.filter(term) : data;
 
   return (
     <div>
-      <u><header className='head'>{head}</header></u>
+      <u><header className="head">{head}</header></u>
       <div className="cards">
-        {data.filter(term).map((item, i) => (
-          <CardItem
-            key={i}
-            item={item}
-            becomeFavorite={becomeFavorite}
-            addToCart={addToCart}
-            removeFromCart={removeFromCart}
-            changePrice={route === "cart" ? true : false}
-          />
-        ))}
+        {filteredData.length > 0 ? (
+          filteredData.map((item) => (
+            <CardItem
+              key={item.id}
+              item={item}
+              becomeFavorite={becomeFavorite}
+              addToCart={addToCart}
+              removeFromCart={removeFromCart}
+              changePrice={route === "cart"}
+            />
+          ))
+        ) : (
+          <h3 className='find'>
+            Нет книг.
+          </h3>
+        )}
       </div>
     </div>
   );

@@ -10,13 +10,14 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      const { data } = await axios.post('/api/accounts/login', { login, password });
+      const { data } = await axios.post('http://localhost:5000/api/auth/login', { login, password });
       localStorage.setItem('user', JSON.stringify(data));
       navigate('/');
     } catch (err) {
@@ -43,16 +44,28 @@ const Login = () => {
             type="text"
             value={login}
             onChange={(e) => setLogin(e.target.value)}
+            placeholder='Введите логин'
             required
           />
           <label className="formLabel">Пароль</label>
-          <input
-            className='formInput'
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
+          <div className="passwordWrapper">
+            <input
+              className="formInput"
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              placeholder="Введите пароль"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((prev) => !prev)}
+              className="togglePasswordBtn"
+            >
+              {showPassword ? '🙈' : '👁️'}
+            </button>
+          </div>
+
         </Form>
         <div className="hint">
             Нет аккаунта? <Link className='redirectLink' to="/register">Зарегистрируйтесь</Link>

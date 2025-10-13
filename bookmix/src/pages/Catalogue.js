@@ -1,4 +1,5 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
+import axios from 'axios';
 import Header from '../components/Header.js';
 import Footer from '../components/Footer.js';
 import Card from '../components/CardMain.js';
@@ -8,17 +9,23 @@ import { motion } from "framer-motion"
 const Catalogue = () => {
 
     const [searchTerm, setSearchTerm] = useState('');
+    const [categories, setCategories] = useState([]);
+
+    useEffect(() => {
+        axios.get('http://localhost:5000/api/categories')
+            .then(res => setCategories(res.data || []))
+            .catch(err => console.log(err));
+    }, []);
 
     const handleSearchChange = (e) => {
         setSearchTerm(e.target.value);
     };
 
-    const createFilterTerm = (genre) => {
-        const g = (genre || '').toLowerCase();
-        return searchTerm === ""
-        ? d => (d.genre || '').toLowerCase() === g
-        : d => (d.genre || '').toLowerCase() === g && d.name.toLowerCase().includes(searchTerm.toLowerCase());
+   const createFilterTerm = (categoryId) => {
+        return (book) => book.categoryId === categoryId;
     };
+
+
     
     return (
         <div>
@@ -36,10 +43,11 @@ const Catalogue = () => {
                     <input className='findPanel' id="search" type='text' value={searchTerm} onChange={handleSearchChange}></input>
                        
                     <ul>
-                        <li className='redirect'><a className='redirect' href='#classic'>Классическая литература</a></li>
-                        <li className='redirect'><a className='redirect' href='#modern'>Современная литература</a></li>
-                        <li className='redirect'><a className='redirect' href='#manga'>Манга</a></li>
-                        <li className='redirect'><a className='redirect' href='#comics'>Комиксы</a></li>
+                        {categories.map(cat => (
+                            <li key={cat.id_category} className='redirect'>
+                                <a className='redirect' href={`#cat-${cat.id_category}`}>{cat.name}</a>
+                            </li>
+                        ))}
                     </ul>
                 </motion.div>
                 <motion.div
@@ -55,34 +63,15 @@ const Catalogue = () => {
                 
                         }}
                 >
-                    <div id="classic">
-                        <Card
-                            head = "Классические произведения"    
-                            term = {createFilterTerm("Классика")}
-                            route=""       
-                        />
-                    </div>
-                    <div id="modern">
-                        <Card
-                            head = "Современная литература"    
-                            term = {createFilterTerm("Современная литература")}  
-                            route=""        
-                        />
-                    </div>
-                    <div id="manga">
-                        <Card
-                            head = "Манга"    
-                            term = {createFilterTerm("Манга")}   
-                            route=""       
-                        />
-                    </div>
-                    <div id="comics">
-                        <Card
-                            head = "Комиксы"    
-                            term = {createFilterTerm("Комиксы")} 
-                            route=""        
-                        />
-                    </div>
+                    {categories.map(cat => (
+                        <div key={cat.id_category} id={`cat-${cat.id_category}`}>
+                            <Card
+                                head = {cat.name}
+                                term = {createFilterTerm(cat.id_category)}
+                                route = ""
+                            />
+                        </div>
+                    ))}
                 </motion.div>
             </div>
             <Footer/>

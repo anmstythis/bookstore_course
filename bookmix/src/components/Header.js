@@ -14,12 +14,6 @@ const Header = ({title, description}) =>
     const [data, setData] = useState([]);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-    useEffect(() => {
-        axios.get('http://localhost:3001/media')
-        .then(res => setData(res.data))
-        .catch(err => console.log(err));
-    }, []);
-
     const isCartNotEmpty = data.some(item => item.addedToCart === true);
 
     const toggleMenu = () => {

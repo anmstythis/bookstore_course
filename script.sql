@@ -122,17 +122,6 @@ INSERT INTO Roles (Rolename) VALUES
 ('Администратор'),
 ('Покупатель');
 
--- Аккаунты
-INSERT INTO Accounts (Login, HashPassword, Role_ID) VALUES
-('admin', 'hash_admin', 1),
-('user1', 'hash_user1', 2),
-('user2', 'hash_user2', 2);
-
--- Пользователи
-INSERT INTO Users (Lastname, Firstname, Patronymic, Email, Account_ID) VALUES
-('Иванов', 'Иван', 'Иванович', 'ivanov@mail.com', 2),
-('Петров', 'Пётр', 'Сергеевич', 'petrov@mail.com', 3);
-
 -- Адреса
 INSERT INTO Addresses (Country, City, Street, House, Apartment, Indexmail) VALUES
 ('Россия', 'Москва', 'Тверская', 10, 15, '101000'),
@@ -176,25 +165,6 @@ INSERT INTO Books (Title, Description, PublishDate, Author_ID, Publisher_ID, Cat
 ('Волшебник изумрудного города', 'Сказочная повесть «Волшебник Изумрудного города» является переработкой сказки американского писателя Ф. Баума. Она рассказывает об удивительных приключениях девочки Элли и ее друзей в Волшебной стране.', null, 4, 1, 4, 1499.00, 5, 'https://cdn.ast.ru/v2/AST000000000153536/COVER/cover1__w410.jpg')
 ('Евгений Онегин', 'Роман в стихах', '1833-01-01', 1, 1, 2, 350.00, 10, 'img/onegin.jpg'),
 ('Война и мир', 'Эпопея', '1869-01-01', 2, 2, 1, 1200.00, 5, 'img/warpeace.jpg');
-
-update 
-
--- Заказы
-INSERT INTO Orders (OrderDate, User_ID, Status_ID, DeliveryType_ID, Address_ID) VALUES
-('2025-09-01 10:00:00', 1, 1, 1, 1),
-('2025-09-05 15:30:00', 2, 2, 2, 2);
-
--- Детали заказов
-INSERT INTO OrderDetails (Order_ID, Price, Quantity, Book_ID) VALUES
-(1, 350.00, 1, 1),
-(1, 1200.00, 1, 2),
-(2, 800.00, 2, 3);
-
--- Отзывы
-INSERT INTO Reviews (User_ID, Book_ID, Rating, UserComment, ReviewDate) VALUES
-(1, 1, 5, 'Очень понравилось!', '2025-09-02 12:00:00'),
-(1, 2, 4, 'Сложно читать, но круто', '2025-09-03 14:00:00'),
-(2, 3, 5, 'Мощный роман', '2025-09-06 09:30:00');
 
 
 -- ПРЕДСТАВЛЕНИЯ
@@ -438,5 +408,8 @@ WHERE id_user = 1; --проверка email
 UPDATE Publishers 
 SET ContactNum = '8q95h234K67'
 WHERE id_publisher = 1; --проверка номера телефона
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 
 

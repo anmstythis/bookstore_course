@@ -3,119 +3,128 @@ import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import Footer from '../components/Footer.js';
 import Header from '../components/Header.js';
-import { motion } from "framer-motion"
+import { motion } from "framer-motion";
 
 const ProductInfo = () => {
-    const { id } = useParams();
+  const { id } = useParams(); 
+  const [book, setBook] = useState(null);
+  const [error, setError] = useState(null);
 
-    const [data, setData] = useState(null);
-    const [error, setError] = useState(null);
-    const [selectedItem, setSelectedItem] = useState(null);
-  
-    useEffect(() => {
-      const fetchData = async () => {
-        try {
-          const response = await axios.get('http://localhost:3001/media');
-          const filteredData = response.data.find(item => item.id === id);
-          if (!filteredData) {
-            throw new Error('Такого продукта нет!');
-          }
-          setData(filteredData);
+  useEffect(() => {
+  const fetchBook = async () => {
+    try {
+      const response = await axios.get(`http://localhost:5000/api/books/${id}`);
+      if (!response.data) throw new Error("Такой книги нет!");
+      const row = response.data;
 
-        } catch (error) {
-          setError(error.message);
-        } 
-      };
-  
-      fetchData();
-    }, [id]);
-    
-      if (error) {
-        return <div className='welcome'>Ошибка: {error}</div>;
-      }
-    
-      if (!data) {
-        return <div className='welcome'>Нет данных.</div>;
-      }
+      const authorResponse = await axios.get(`http://localhost:5000/api/authors/${row.author_id}`);
+      const author = authorResponse.data;
 
-      const addToCart = (Item) => {
-        if (Item) {
-          Item.addedToCart = true;
-          Item.addedAmount += 1;
-          axios.put(`http://localhost:3001/media/${Item.id}`, Item)
-            .then(() => {
-              setData({...data, [Item.id]: Item});
-              console.log(Item);
-            })
-            .catch(err => console.error(err));
-        }
+      const mapped = {
+        id: row.id_book,
+        name: row.title,
+        authorId: row.author_id,
+        author: author ? `${author.firstname} ${author.patronymic} ${author.lastname} 
+        (${author.birthdate ? author.birthdate.substring(0, 4) : '???'} - 
+            ${author.deathdate ? author.deathdate.substring(0, 4) : 'н.в.'})` : 'Неизвестный автор',
+        country: row.country,
+        price: Number(row.price),
+        url: row.imageurl,
+        description: row.description,
+        addedToCart: row.addedtocart || false,
+        addedAmount: row.addedamount || 0,
+        isFavorite: row.isfavorite || false
       };
 
-      const removeFromCart = (Item) => {
-        if (Item) {
-          if (Item.addedAmount <= 1) {
-            Item.addedAmount = 0;
-            Item.addedToCart = false;
-          } else {
-            Item.addedAmount -= 1;
-          }
-      
-          axios.put(`http://localhost:3001/media/${Item.id}`, Item)
-            .then(() => {
-              setData({...data, [Item.id]: Item});
-              console.log(Item);
-            })
-            .catch(err => console.error(err));
-        }
-      };
-    
-      const becomeFavorite = (id) => {
-        if (data.id !== id) {
-          console.error('Такой книги нет.');
-          return;
-        }
+      setBook(mapped);
+    } catch (err) {
+      console.error("Ошибка при загрузке:", err);
+      setError(err.message);
+    }
+  };
 
-        const updatedBook = { ...data, isFavorite: !data.isFavorite };
+  fetchBook();
+}, [id]);
 
-        axios.put(`http://localhost:3001/media/${updatedBook.id}`, updatedBook)
-          .then(() => {
-            setData(updatedBook);
-          })
-          .catch(err => {
-            console.error(err);
-          });
-      };
 
-    return (
-        <div>
-            <Header
-              title="Сведения о книге"
-            />
-            <motion.div className='productInfoCard'
-              initial={{ opacity: 0, scale:0 }}
-              animate={{ opacity: 1, scale: 1}}
-              transition={{ delay: 0.5, duration: 1 }}
-            >
-                <img className='prodImg' src={data.url} />
-                <button className={data.isFavorite ? 'favButton2' : 'notFavButton2'} onClick={() => becomeFavorite(id)}>❤</button>
-                <h2 className='titleProd'>Название книги: {data.name}</h2>
-                <h2 className='authorProd'>Автор книги: {data.author}</h2>
-                <h2 className='countryProd'>Страна: {data.country}</h2>
-                <div className='buttons2'>
-                  <button className='cartButton' onClick={() => addToCart(data.id)}>+</button>
-                  <button className='cartButton' onClick={() => removeFromCart(data)}>-</button>
-                </div>
-                <p className='descrProd'>Описание: {data.description}</p>
-            </motion.div>
-            <motion.div
-              initial={{ y: 1000 }}
-              animate={{ y: 0}}
-              transition={{ duration: 1.5 }}
-            >
-              <Footer/>
-            </motion.div>
+  // корзина
+  const addToCart = () => {
+    if (!book) return;
+    const updated = {
+      ...book,
+      addedToCart: true,
+      addedAmount: (book.addedAmount || 0) + 1
+    };
+
+    setBook(updated);
+    axios.put(`http://localhost:5000/api/books/${book.id}`, updated).catch(console.error);
+  };
+
+  const removeFromCart = () => {
+    if (!book) return;
+    const updatedAmount = Math.max((book.addedAmount || 0) - 1, 0);
+    const updated = {
+      ...book,
+      addedAmount: updatedAmount,
+      addedToCart: updatedAmount > 0
+    };
+
+    setBook(updated);
+    axios.put(`http://localhost:5000/api/books/${book.id}`, updated).catch(console.error);
+  };
+
+  // избранное
+  const toggleFavorite = () => {
+    if (!book) return;
+    const updated = { ...book, isFavorite: !book.isFavorite };
+    setBook(updated);
+    axios.put(`http://localhost:5000/api/books/${book.id}`, updated).catch(console.error);
+  };
+
+  if (error) return <div className='welcome'>Ошибка: {error}</div>;
+  if (!book) return <div className='welcome'>Загрузка...</div>;
+
+  return (
+    <div>
+      <Header title="Сведения о книге" />
+
+      <motion.div
+        className='productInfoCard'
+        initial={{ opacity: 0, scale: 0 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 0.5, duration: 1 }}
+      >
+        <img className='prodImg' src={book.url} alt={book.name} />
+
+        <button
+          className={book.isFavorite ? 'favButton2' : 'notFavButton2'}
+          onClick={toggleFavorite}
+        >
+          ❤
+        </button>
+
+        <h2 className='titleProd'>Название: {book.name}</h2>
+        <h2 className='authorProd'>Автор: {book.author}</h2>
+        {book.country && <h2 className='countryProd'>Страна: {book.country}</h2>}
+
+        <div className='buttons2'>
+          <button className='cartButton' onClick={addToCart}>+</button>
+          <span className='amount'>{book.addedAmount}</span>
+          <button className='cartButton' onClick={removeFromCart}>-</button>
         </div>
-    );
+
+        <p className='descrProd'>Описание: {book.description}</p>
+      </motion.div>
+
+      <motion.div
+        initial={{ y: 1000 }}
+        animate={{ y: 0 }}
+        transition={{ duration: 1.5 }}
+      >
+        <Footer />
+      </motion.div>
+    </div>
+  );
 };
 
 export default ProductInfo;

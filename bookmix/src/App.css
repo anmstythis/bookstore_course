@@ -544,3 +544,24 @@ u
   font-weight: bold;
   font-size: 14pt;
 }
+
+.passwordWrapper {
+  position: relative;
+  width: 100%;
+}
+
+.passwordWrapper .formInput {
+  width: 100%;
+  padding-right: 2.5rem;
+  box-sizing: border-box;
+}
+
+.togglePasswordBtn {
+  position: absolute;
+  top: 50%;
+  right: 0.5rem;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  font-size: 1.2rem;
+}
