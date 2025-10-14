@@ -24,7 +24,7 @@ const ProductInfo = () => {
         id: row.id_book,
         name: row.title,
         authorId: row.author_id,
-        author: author ? `${author.firstname} ${author.patronymic} ${author.lastname} 
+        author: author ? `${author.firstname} ${author.patronymic ? author.patronymic : ' '} ${author.lastname} 
         (${author.birthdate ? author.birthdate.substring(0, 4) : '???'} - 
             ${author.deathdate ? author.deathdate.substring(0, 4) : 'н.в.'})` : 'Неизвестный автор',
         country: row.country,
@@ -113,7 +113,7 @@ const ProductInfo = () => {
           <button className='cartButton' onClick={removeFromCart}>-</button>
         </div>
 
-        <p className='descrProd'>Описание: {book.description}</p>
+        <p className='descrProd'>{book.description}</p>
       </motion.div>
 
       <motion.div

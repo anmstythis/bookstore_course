@@ -438,7 +438,7 @@ u
   text-shadow: #1D1C1A 3px 4px 5px;
   margin-left: 20px;
   margin-right: 20px;
-  margin-top: 50px;
+  margin-top: 60px;
   text-align: justify;
 }
 
@@ -524,6 +524,15 @@ u
   font-weight: bold;
   color: #0d0c08;
 }
+
+.amount {
+  color: white;
+  font-size: 24pt;
+  margin-left: 20pt;
+  margin-right: 20pt;
+  font-family: Georgia, 'Times New Roman', Times, serif;
+}
+
 
 /* ---ФОРМА ДЛЯ ЗАПОЛНЕНИЯ--- */
 .formInput

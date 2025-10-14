@@ -21,8 +21,15 @@ const Catalogue = () => {
         setSearchTerm(e.target.value);
     };
 
-   const createFilterTerm = (categoryId) => {
-        return (book) => book.categoryId === categoryId;
+   const createFilterTerm = (categoryId, search) => {
+        const normalizedSearch = (search || '').trim().toLowerCase();
+        return (book) => {
+            const inCategory = book.categoryId === categoryId;
+            if (!normalizedSearch) return inCategory;
+
+            const nameMatches = (book.name || '').toLowerCase().includes(normalizedSearch);
+            return inCategory && (nameMatches);
+        };
     };
 
 
@@ -66,9 +73,9 @@ const Catalogue = () => {
                     {categories.map(cat => (
                         <div key={cat.id_category} id={`cat-${cat.id_category}`}>
                             <Card
-                                head = {cat.name}
-                                term = {createFilterTerm(cat.id_category)}
-                                route = ""
+                                head={cat.name}
+                                term={createFilterTerm(cat.id_category, searchTerm)}
+                                route=""
                             />
                         </div>
                     ))}
