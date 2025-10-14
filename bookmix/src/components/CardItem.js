@@ -1,6 +1,4 @@
-import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
 
 const CardItem = ({ item, becomeFavorite, addToCart, removeFromCart, changePrice}) => {
   const navigate = useNavigate();
@@ -16,7 +14,7 @@ const CardItem = ({ item, becomeFavorite, addToCart, removeFromCart, changePrice
       <h3 className="card-title">{item.name}</h3>
       <button className='infoButton' onClick={() => handleButtonClick(item.id)}>🛈</button>
       <p className="card-text">{item.author}</p>
-      <h2 className='price'>{item.addedAmount != 0 && changePrice === true ? item.price * item.addedAmount : item.price} руб.</h2>
+      <h2 className='price'>{item.addedAmount !== 0 && changePrice === true ? item.price * item.addedAmount : item.price} руб.</h2>
       <div className='buttons'>
         <button className='cartButton' onClick={() => addToCart(item.id)}>+</button>
         <button className='cartButton' onClick={() => removeFromCart(item.id)}>-</button>

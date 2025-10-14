@@ -57,7 +57,7 @@ const Header = ({title, description}) =>
         <div>
             <div className="mainpage">
                 <div className="menuWrapper" ref={menuRef}>
-                    <button className="menuButton" onClick={toggleMenu} aria-haspopup="true" aria-expanded={isMenuOpen}/>
+                    <button className="menuButton" onClick={toggleMenu} aria-haspopup="true" aria-expanded={isMenuOpen}>⚙</button>
                     {isMenuOpen && (
                         <div className="menuDropdown" role="menu">
                             <button className="menuItem" onClick={handleNavigateAccount} role="menuitem">Учетная запись</button>
@@ -69,7 +69,7 @@ const Header = ({title, description}) =>
                 <header className="welcome">
                 {title}
                 </header>
-                <button className={isCartNotEmpty ? "cartFull" : "cartEmpty"} onClick={() => handleButtonClick()}/>
+                <button className={isCartNotEmpty ? "cartFull" : "cartEmpty"} onClick={() => handleButtonClick()}>🛒</button>
             </div>
             <h2 className="find">{description}</h2>
         </div>
