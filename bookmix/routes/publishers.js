@@ -7,9 +7,7 @@ const router = express.Router();
 router.get('/', async (req, res) => {
 	try {
 		const result = await pool.query(
-			`SELECT p.id_publisher, p.legalname, p.contactnum, p.email, p.address_id,
-			        a.city, a.street, a.house
-			 FROM publishers p
+			`SELECT *FROM publishers p
 			 LEFT JOIN addresses a ON p.address_id = a.id_address
 			 ORDER BY p.id_publisher`
 		);

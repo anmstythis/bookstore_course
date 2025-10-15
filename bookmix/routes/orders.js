@@ -7,8 +7,7 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT *
-       FROM orders o
+      `SELECT *FROM orders o
        JOIN users u ON o.user_id = u.id_user
        JOIN statuses s ON o.status_id = s.id_status
        LEFT JOIN deliverytypes d ON o.deliverytype_id = d.id_deliverytype

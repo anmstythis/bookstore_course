@@ -19,12 +19,13 @@ const Login = () => {
     try {
       const { data } = await axios.post('http://localhost:5000/api/auth/login', { login, password });
       localStorage.setItem('user', JSON.stringify(data));
-      navigate('/');
+      navigate('/', { replace: true }); 
     } catch (err) {
       setError(err?.response?.data?.error || 'Не удалось войти.');
     } finally {
       setLoading(false);
     }
+    window.location.reload();
   };
 
   return (
@@ -70,11 +71,13 @@ const Login = () => {
         <div className="hint">
             Нет аккаунта? <Link className='redirectLink' to="/register">Зарегистрируйтесь</Link>
         </div>
+
+        <div className="hint">
+            Забыли пароль? <Link className='redirectLink' to="/reset-password">Сбросьте его</Link>
+        </div>
       </div>
     </div>
   );
 };
 
 export default Login;
-
-

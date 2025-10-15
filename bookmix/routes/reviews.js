@@ -7,9 +7,7 @@ const router = express.Router();
 router.get('/book/:bookId', async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT r.id_review, r.rating, r.usercomment, r.reviewdate, 
-              u.lastname || ' ' || u.firstname AS author
-       FROM reviews r
+      `SELECT *FROM reviews r
        JOIN users u ON r.user_id = u.id_user
        WHERE r.book_id=$1
        ORDER BY r.reviewdate DESC`,

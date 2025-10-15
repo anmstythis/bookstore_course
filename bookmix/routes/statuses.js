@@ -6,7 +6,7 @@ const router = express.Router();
 // все статусы
 router.get('/', async (req, res) => {
 	try {
-		const result = await pool.query(`SELECT * FROM statuses ORDER BY id_status`);
+		const result = await pool.query(`SELECT *FROM statuses ORDER BY id_status`);
 		res.json(result.rows);
 	} catch (err) {
 		res.status(500).json({ error: err.message });
@@ -16,7 +16,7 @@ router.get('/', async (req, res) => {
 // статус по id
 router.get('/:id', async (req, res) => {
 	try {
-		const result = await pool.query(`SELECT * FROM statuses WHERE id_status=$1`, [req.params.id]);
+		const result = await pool.query(`SELECT *FROM statuses WHERE id_status=$1`, [req.params.id]);
 		if (result.rows.length === 0) return res.status(404).json({ error: 'Статус не найден' });
 		res.json(result.rows[0]);
 	} catch (err) {

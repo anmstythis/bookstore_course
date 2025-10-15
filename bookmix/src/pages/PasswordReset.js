@@ -1,0 +1,143 @@
+import React, { useState, useMemo } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import axios from 'axios';
+import Header from '../components/Header.js';
+import Form from '../components/Form.js';
+
+const ResetPassword = () => {
+  const navigate = useNavigate();
+
+  const storedUser = useMemo(() => {
+    try {
+      const userString = localStorage.getItem('user');
+      return userString ? JSON.parse(userString) : null;
+    } catch (e) {
+      return null;
+    }
+  }, []);
+
+  const [login, setLogin] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+
+    if (password !== confirmPassword) {
+      setError('Пароли не совпадают.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+        if (storedUser)
+        {
+            await axios.patch(`http://localhost:5000/api/accounts/${storedUser.id_account}`, {password, });
+        }
+        else
+        {
+            await axios.patch(`http://localhost:5000/api/auth/reset`, {login, password});
+        }
+
+        setSuccess('Пароль успешно обновлён!');
+        setPassword('');
+        setConfirmPassword('');
+
+        localStorage.removeItem('user');
+        navigate('/login');
+        window.location.reload();
+    } catch (err) {
+      console.error('Ошибка при обновлении пароля:', err);
+      setError('Не удалось сбросить пароль.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div>
+      <Header title={'Сброс пароля'} description={storedUser ? 'Введите новый пароль дважды' : 'Введите логин и новый пароль дважды'} />
+      <div className="formContainer">
+        <Form
+          onSubmit={handleSubmit}
+          loading={loading}
+          error={error}
+          success={success}
+          submitLabel={'Сбросить пароль'}
+          loadingLabel={'Обновляем...'}
+        >
+            {!storedUser && (
+            <>
+              <label className="formLabel">Логин</label>
+              <input
+                className="formInput"
+                type="text"
+                value={login}
+                onChange={(e) => setLogin(e.target.value)}
+                placeholder="Введите логин"
+                required
+              />
+            </>
+          )}
+          <label className="formLabel">Новый пароль</label>
+          <div className="passwordWrapper">
+            <input
+              className="formInput"
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Введите новый пароль"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((prev) => !prev)}
+              className="togglePasswordBtn"
+            >
+              {showPassword ? '🙈' : '👁️'}
+            </button>
+          </div>
+
+          <label className="formLabel">Подтверждение пароля</label>
+          <div className="passwordWrapper">
+            <input
+              className="formInput"
+              type={showPassword ? 'text' : 'password'}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Подтвердите новый пароль"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((prev) => !prev)}
+              className="togglePasswordBtn"
+            >
+              {showPassword ? '🙈' : '👁️'}
+            </button>
+          </div>
+        </Form>
+
+       <div className="hint">
+        {storedUser ? (
+            <>
+            Вернуться к <Link className="redirectLink" to="/account">профилю</Link>
+            </>
+        ) : (
+            <>
+            Вернуться к <Link className="redirectLink" to="/login">входу</Link>
+            </>
+        )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ResetPassword;

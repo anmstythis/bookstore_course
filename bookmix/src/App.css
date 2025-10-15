@@ -325,7 +325,6 @@ u
 .menuDropdown {
   position: absolute;
   top: 100%;
-  right: 0;
   background-color: #887756;
   border: 1px solid #4d4431;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
@@ -335,7 +334,7 @@ u
   animation: fadeIn 0.15s ease-in-out;
 }
 
-.menuItem {
+.menuItem, .menuItemDanger  {
   width: 100%;
   padding: 10px 16px;
   text-align: left;
@@ -346,14 +345,11 @@ u
   color: white;
   cursor: pointer;
   transition: background-color 0.2s ease, color 0.2s ease;
+  text-decoration: underline;
 }
 
 .menuItem:hover {
   background-color:#2d1d03;
-}
-
-.menuItemDanger {
-  color: white;
 }
 
 .menuItemDanger:hover {
@@ -602,7 +598,7 @@ u
 
 .redirectLink
 {
-  color: #3c2306;
+  color: #d49d6c;
   font-family: Georgia, 'Times New Roman', Times, serif;
   font-style: italic;
   font-weight: bold;
@@ -628,4 +624,31 @@ u
   border: none;
   background: transparent;
   font-size: 1.2rem;
+}
+
+/* ---ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ--- */
+.table {
+  width: 100%;
+  font-size: 16pt;
+  color: white;
+  font-family: Georgia, 'Times New Roman', Times, serif;
+  margin-top: 30px;
+}
+
+.table thead {
+  background-color: #44360a;
+}
+
+.table th {
+  text-align: left;
+  padding: 16px;
+  font-weight: bold;
+}
+
+.table td {
+  padding: 16px;
+}
+
+.table th[scope="row"] {
+  text-align: left;
 }

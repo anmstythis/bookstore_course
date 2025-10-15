@@ -55,7 +55,7 @@ router.post('/login', async (req, res) => {
 
     const result = await pool.query(
       `SELECT a.id_account, a.login, a.role_id, r.rolename,
-              u.id_user, u.lastname, u.firstname, u.email
+              u.id_user, u.lastname, u.firstname, u.patronymic, u.email
        FROM accounts a
        JOIN roles r ON a.role_id = r.id_role
        LEFT JOIN users u ON u.account_id = a.id_account
@@ -73,6 +73,31 @@ router.post('/login', async (req, res) => {
     });
   } catch (err) {
     console.error('Ошибка входа:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.patch('/reset', async (req, res) => {
+  try {
+    const { login, password } = req.body;
+    if (!login || !password) {
+      return res.status(400).json({ error: 'Логин и новый пароль обязательны' });
+    }
+
+    const result = await pool.query(
+      `UPDATE accounts
+       SET hashpassword = crypt($1, gen_salt('bf'))
+       WHERE login = $2
+       RETURNING *`,
+      [password, login]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Аккаунт не найден' });
+    }
+
+    res.json({ message: 'Пароль успешно сброшен', account: result.rows[0] });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });

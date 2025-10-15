@@ -229,6 +229,61 @@ export default {
 				}
 			}
 		},
+		'/api/auth/reset': {
+		patch: {
+			summary: 'Сброс пароля по логину',
+			tags: ['Авторизация'],
+			security: [], // доступен без токена
+			requestBody: {
+			required: true,
+			content: {
+				'application/json': {
+				schema: {
+					type: 'object',
+					properties: {
+					login: { type: 'string', example: 'user123' },
+					password: { type: 'string', example: 'newStrongPassword123' }
+					},
+					required: ['login', 'password']
+				}
+				}
+			}
+			},
+			responses: {
+			200: {
+				description: 'Пароль успешно сброшен',
+				content: {
+				'application/json': {
+					schema: {
+						type: 'object',
+						properties: {
+							message: { type: 'string', example: 'Пароль успешно сброшен' },
+							account: {
+								type: 'object',
+								properties: {
+									id_account: { type: 'integer' },
+									login: { type: 'string'},
+									role_id: { type: 'integer'}
+								}
+							}
+						}
+					}
+				}
+				}
+			},
+			400: {
+				description: 'Не указан логин или пароль'
+			},
+			404: {
+				description: 'Аккаунт не найден'
+			},
+			500: {
+				description: 'Ошибка сервера'
+			}
+			}
+		}
+		},
+
 		'/api/books': {
 			get: {
 				summary: 'Получить все книги',
@@ -333,12 +388,87 @@ export default {
 				summary: 'Получить всех пользователей', 
 				tags: ['Пользователи'],
 				responses: { 
-					200: { 
-						description: 'OK' 
-					} 
-				} 
+				200: { 
+					description: 'Список всех пользователей успешно получен' 
+				},
+				500: { 
+					description: 'Ошибка сервера' 
+				}
+				}
 			},
-		},
+			},
+			'/api/users/{id}': {
+			get: {
+				summary: 'Получить пользователя по ID',
+				tags: ['Пользователи'],
+				parameters: [
+				{
+					name: 'id',
+					in: 'path',
+					required: true,
+					schema: { type: 'integer' },
+					description: 'ID пользователя',
+				},
+				],
+				responses: {
+				200: { description: 'Пользователь найден' },
+				404: { description: 'Пользователь не найден' },
+				500: { description: 'Ошибка сервера' },
+				},
+			},
+			put: {
+				summary: 'Обновить данные пользователя (полная замена)',
+				tags: ['Пользователи'],
+				parameters: [
+				{
+					name: 'id',
+					in: 'path',
+					required: true,
+					schema: { type: 'integer' },
+					description: 'ID пользователя для обновления',
+				},
+				],
+				requestBody: {
+				required: true,
+				content: {
+					'application/json': {
+					schema: {
+						type: 'object',
+						properties: {
+						lastname: { type: 'string' },
+						firstname: { type: 'string' },
+						patronymic: { type: 'string' },
+						email: { type: 'string' },
+						},
+						required: ['lastname', 'firstname', 'email'],
+					},
+					},
+				},
+				},
+				responses: {
+					200: { description: 'Пользователь успешно обновлён' },
+					400: { description: 'Некорректные данные' },
+					404: { description: 'Пользователь не найден'}
+				},
+			},
+			delete: {
+				summary: 'Удалить пользователя по ID',
+				tags: ['Пользователи'],
+				parameters: [
+				{
+					name: 'id',
+					in: 'path',
+					required: true,
+					schema: { type: 'integer' },
+					description: 'ID пользователя для удаления',
+				},
+				],
+				responses: {
+					200: { description: 'Пользователь успешно удалён' },
+					404: { description: 'Пользователь не найден' }
+				},
+			},
+			},
 		'/api/orders': {
 			get: { 
 				summary: 'Все заказы', 
@@ -696,45 +826,82 @@ export default {
 				summary: 'Все аккаунты',
 				tags: ['Аккаунты'], 
 				responses: { 
-					200: { 
-						description: 'OK' 
-					} 
+				200: { 
+					description: 'OK' 
+				} 
 				} 
 			}, 
-		},
+			},
 		'/api/accounts/{id}': { 
 			get: { 
 				summary: 'Аккаунт по id', 
 				tags: ['Аккаунты'],
 				parameters: [{ 
-					name: 'id', 
-					in: 'path', 
-					required: true, 
-					schema: { type: 'integer' } }], 
+				name: 'id', 
+				in: 'path', 
+				required: true, 
+				schema: { type: 'integer' } 
+				}], 
 				responses: { 
-					200: { 
-						description: 'OK' 
-					}, 
-					404: { 
-						description: 'Not Found' 
-					} 
+				200: { 
+					description: 'OK' 
+				}, 
+				404: { 
+					description: 'Not Found' 
+				} 
 				} 
 			}, 
+			patch: {
+				summary: 'Обновить аккаунт',
+				tags: ['Аккаунты'],
+				parameters: [{
+				name: 'id',
+				in: 'path',
+				required: true,
+				schema: { type: 'integer' }
+				}],
+				requestBody: {
+				required: true,
+				content: {
+					'application/json': {
+					schema: {
+						type: 'object',
+						properties: {
+						login: { type: 'string', example: 'new_user' },
+						password: { type: 'string', example: 'new_password123' },
+						role_id: { type: 'integer', example: 2 }
+						},
+						required: ['login', 'password', 'role_id']
+					}
+					}
+				}
+				},
+				responses: {
+				200: {
+					description: 'Аккаунт обновлён'
+				},
+				404: {
+					description: 'Аккаунт не найден'
+				}
+				}
+			},
 			delete: { 
 				summary: 'Удалить аккаунт', 
 				tags: ['Аккаунты'],
 				parameters: [{ 
-					name: 'id', 
-					in: 'path', 
-					required: true, 
-					schema: { type: 'integer' } }], 
+				name: 'id', 
+				in: 'path', 
+				required: true, 
+				schema: { type: 'integer' } 
+				}], 
 				responses: { 
-					200: { 
-						description: 'Deleted' 
-					} 
+				200: { 
+					description: 'Deleted' 
+				} 
 				} 
 			} 
 		},
+
 		'/api/addresses': { 
 			get: { 
 				summary: 'Все адреса', 

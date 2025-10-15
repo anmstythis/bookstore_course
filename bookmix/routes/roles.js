@@ -6,7 +6,7 @@ const router = express.Router();
 // все роли
 router.get('/', async (req, res) => {
 	try {
-		const result = await pool.query(`SELECT * FROM roles ORDER BY id_role`);
+		const result = await pool.query(`SELECT *FROM roles ORDER BY id_role`);
 		res.json(result.rows);
 	} catch (err) {
 		res.status(500).json({ error: err.message });
@@ -16,7 +16,7 @@ router.get('/', async (req, res) => {
 // роль по id
 router.get('/:id', async (req, res) => {
 	try {
-		const result = await pool.query(`SELECT * FROM roles WHERE id_role=$1`, [req.params.id]);
+		const result = await pool.query(`SELECT *FROM roles WHERE id_role=$1`, [req.params.id]);
 		if (result.rows.length === 0) return res.status(404).json({ error: 'Роль не найдена' });
 		res.json(result.rows[0]);
 	} catch (err) {

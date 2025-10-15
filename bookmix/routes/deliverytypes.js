@@ -6,7 +6,7 @@ const router = express.Router();
 // все типы доставки
 router.get('/', async (req, res) => {
 	try {
-		const result = await pool.query(`SELECT * FROM deliverytypes ORDER BY id_deliverytype`);
+		const result = await pool.query(`SELECT *FROM deliverytypes ORDER BY id_deliverytype`);
 		res.json(result.rows);
 	} catch (err) {
 		res.status(500).json({ error: err.message });
@@ -16,7 +16,7 @@ router.get('/', async (req, res) => {
 // тип доставки по id
 router.get('/:id', async (req, res) => {
 	try {
-		const result = await pool.query(`SELECT * FROM deliverytypes WHERE id_deliverytype=$1`, [req.params.id]);
+		const result = await pool.query(`SELECT *FROM deliverytypes WHERE id_deliverytype=$1`, [req.params.id]);
 		if (result.rows.length === 0) return res.status(404).json({ error: 'Тип доставки не найден' });
 		res.json(result.rows[0]);
 	} catch (err) {
