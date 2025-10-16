@@ -591,6 +591,69 @@ u
   margin-top: 5px;
 }
 
+/* ---ОТЗЫВЫ / ФОРМА ОЦЕНКИ--- */
+.reviewsSection {
+  margin-top: 30px;
+}
+
+.reviewsList {
+  list-style: none;
+  padding-left: 0;
+  margin: 10px 20px;
+  display: grid;
+  row-gap: 12px;
+}
+
+.reviewItem {
+  padding: 12px 16px;
+  color: #ffffff;
+  font-family: Georgia, 'Times New Roman', Times, serif;
+}
+
+.reviewHeader {
+  display: flex;
+  align-items: center;
+  column-gap: 16px;
+  margin-bottom: 10px;
+  font-size: 18pt;
+}
+
+.reviewDeleteBtn {
+  background: transparent;
+  border: 0;
+  color: white;
+  font-size: 20pt;
+  line-height: 1;
+  padding: 2px 6px;
+  margin-left: auto; 
+  cursor: pointer;
+}
+
+.reviewComment {
+  font-family: Georgia, 'Times New Roman', Times, serif;
+  font-size: 20pt;
+}
+
+
+
+.formLabel .favButton,
+.formLabel .notFavButton {
+  width: 32px;
+  height: 32px;
+  font-size: 24pt;
+  margin: 0 4px;
+  background: none;
+  border: 0;
+}
+
+.formLabel .favButton {
+  color: #d3c690; 
+}
+
+.formLabel .notFavButton {
+  color: #887756; 
+}
+
 .formContainer
 {
   justify-self: center;
@@ -674,18 +737,6 @@ u
 }
 
 @media (max-width: 1024px) {
-  .card {
-    grid-template-columns: 1fr 100px;
-    grid-template-rows: auto auto auto auto;
-    width: 320px;
-    height: auto;
-  }
-
-  .card-img-top {
-    width: 100%;
-    height: auto;
-  }
-
   .price {
     align-self: center;
   }
@@ -743,16 +794,6 @@ u
     width: 100%;
   }
 
-  .cards {
-    margin-left: 0;
-    justify-content: center;
-  }
-
-  .card {
-    width: 100%;
-    max-width: 360px;
-  }
-
   .buyButton {
     width: 90%;
   }
@@ -788,11 +829,18 @@ u
     grid-row: 1;
   }
 
-  .titleProd,
-  .authorProd,
-  .countryProd,
-  .descrProd {
-    grid-column: 1;
+  .titleProd {
+    grid-column: 2;
+  }
+
+  .descrProd, .authorProd
+  {
+    grid-column-start: 1;
+    grid-column-end: 4;
+  }
+
+  .buttons2 {
+    grid-column: 2;
   }
 }
 
