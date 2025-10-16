@@ -17,6 +17,32 @@ const ProductInfo = () => {
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
 
+  const getCurrentUserId = () => {
+    try {
+      const userRaw = localStorage.getItem('user');
+      if (!userRaw) return null;
+      const parsed = JSON.parse(userRaw);
+      return parsed?.id_user || null;
+    } catch {
+      return null;
+    }
+  };
+
+  const getCartFromStorage = (userId) => {
+    if (!userId) return [];
+    try {
+      const raw = localStorage.getItem(`cart:${userId}`);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const saveCartToStorage = (userId, cartItems) => {
+    if (!userId) return;
+    localStorage.setItem(`cart:${userId}`, JSON.stringify(cartItems));
+  };
+
   useEffect(() => {
   const fetchBook = async () => {
     try {
@@ -26,6 +52,10 @@ const ProductInfo = () => {
 
       const authorResponse = await axios.get(`http://localhost:5000/api/authors/${row.author_id}`);
       const author = authorResponse.data;
+
+      const userId = getCurrentUserId();
+      const cart = getCartFromStorage(userId);
+      const inCart = cart.find(ci => ci.bookId === row.id_book);
 
       const mapped = {
         id: row.id_book,
@@ -38,8 +68,8 @@ const ProductInfo = () => {
         price: Number(row.price),
         url: row.imageurl,
         description: row.description,
-        addedToCart: row.addedtocart || false,
-        addedAmount: row.addedamount || 0,
+        addedToCart: Boolean(inCart),
+        addedAmount: inCart ? inCart.quantity : 0,
         isFavorite: row.isfavorite || false
       };
 
@@ -131,27 +161,44 @@ const ProductInfo = () => {
   // корзина
   const addToCart = () => {
     if (!book) return;
+    const userId = getCurrentUserId();
+    const cart = getCartFromStorage(userId);
+    const exists = cart.find(ci => ci.bookId === book.id);
+    const newCart = exists
+      ? cart.map(ci => ci.bookId === book.id ? { ...ci, quantity: ci.quantity + 1 } : ci)
+      : [...cart, { bookId: book.id, quantity: 1 }];
+    saveCartToStorage(userId, newCart);
+
     const updated = {
       ...book,
       addedToCart: true,
       addedAmount: (book.addedAmount || 0) + 1
     };
-
     setBook(updated);
-    axios.put(`http://localhost:5000/api/books/${book.id}`, updated).catch(console.error);
   };
 
   const removeFromCart = () => {
     if (!book) return;
+    const userId = getCurrentUserId();
+    const cart = getCartFromStorage(userId);
+    const exists = cart.find(ci => ci.bookId === book.id);
+    let newCart;
+    if (!exists) {
+      newCart = cart;
+    } else if (exists.quantity <= 1) {
+      newCart = cart.filter(ci => ci.bookId !== book.id);
+    } else {
+      newCart = cart.map(ci => ci.bookId === book.id ? { ...ci, quantity: ci.quantity - 1 } : ci);
+    }
+    saveCartToStorage(userId, newCart);
+
     const updatedAmount = Math.max((book.addedAmount || 0) - 1, 0);
     const updated = {
       ...book,
       addedAmount: updatedAmount,
       addedToCart: updatedAmount > 0
     };
-
     setBook(updated);
-    axios.put(`http://localhost:5000/api/books/${book.id}`, updated).catch(console.error);
   };
 
   // избранное

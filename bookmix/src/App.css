@@ -38,6 +38,12 @@ u
   color: #ffffff;
 }
 
+.mainpage
+{
+  display: grid;
+  grid-template-columns: 0.5fr 2fr 0.5fr;
+}
+
 .welcome 
 {
   color: #ffffff;
@@ -502,7 +508,7 @@ u
 .buyButton
 {
   height: 50px;
-  width: 300px;
+  width: 90%;
   font-size: 16pt;
   background-color: #887756;
   border-color: #4d4431;
@@ -712,17 +718,6 @@ u
 
 /* ---АДАПТИВНОСТЬ--- */
 @media (max-width: 1200px) {
-  .mainpage
-  {
-    display: grid;
-    grid-template-columns: 0.5fr 2fr 0.5fr;
-  }
-
-  .welcome {
-    grid-column: 2;
-    font-size: 34pt;
-  }
-
   .cards {
     justify-content: center;
   }
@@ -788,10 +783,6 @@ u
 
   #search {
     width: 100%;
-  }
-
-  .buyButton {
-    width: 90%;
   }
 
   .formInput {
@@ -872,10 +863,6 @@ u
     margin-right: 10px;
   }
 
-  .card {
-    max-width: 320px;
-  }
-
   .card-title {
     font-size: 16pt;
   }
@@ -889,7 +876,6 @@ u
   }
 
   .buyButton {
-    width: calc(100% - 40px);
     margin-left: 20px;
   }
 

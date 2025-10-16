@@ -5,6 +5,32 @@ import CardItem from './CardItem.js';
 const Card = ({ head, term, route }) => {
   const [data, setData] = useState([]);
 
+  const getCurrentUserId = () => {
+    try {
+      const userRaw = localStorage.getItem('user');
+      if (!userRaw) return null;
+      const parsed = JSON.parse(userRaw);
+      return parsed?.id_user || null;
+    } catch {
+      return null;
+    }
+  };
+
+  const getCartFromStorage = (userId) => {
+    if (!userId) return [];
+    try {
+      const raw = localStorage.getItem(`cart:${userId}`);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const saveCartToStorage = (userId, cartItems) => {
+    if (!userId) return;
+    localStorage.setItem(`cart:${userId}`, JSON.stringify(cartItems));
+  };
+
   useEffect(() => {
   const fetchData = async () => {
     try {
@@ -14,6 +40,10 @@ const Card = ({ head, term, route }) => {
       ]);
 
       const authors = authorsRes.data || [];
+
+      const userId = getCurrentUserId();
+      const cart = getCartFromStorage(userId);
+      const cartByBookId = new Map(cart.map(ci => [ci.bookId, ci.quantity]));
 
       const mapped = (booksRes.data || []).map(row => {
         const author = authors.find(a => a.id_author === row.author_id);
@@ -26,8 +56,8 @@ const Card = ({ head, term, route }) => {
           price: Number(row.price),
           url: row.imageurl,
           categoryId: row.category_id,
-          addedToCart: false,
-          addedAmount: 0,
+          addedToCart: cartByBookId.has(row.id_book),
+          addedAmount: cartByBookId.get(row.id_book) || 0,
           isFavorite: false
         };
       });
@@ -44,23 +74,52 @@ const Card = ({ head, term, route }) => {
 
 
   const addToCart = (id) => {
-    setData(prev => prev.map(item =>
-      item.id === id
-        ? { ...item, addedToCart: true, addedAmount: item.addedAmount + 1 }
-        : item
-    ));
+    setData(prev => {
+      const updated = prev.map(item =>
+        item.id === id
+          ? { ...item, addedToCart: true, addedAmount: item.addedAmount + 1 }
+          : item
+      );
+
+      const userId = getCurrentUserId();
+      const cart = getCartFromStorage(userId);
+      const exists = cart.find(ci => ci.bookId === id);
+      const newCart = exists
+        ? cart.map(ci => ci.bookId === id ? { ...ci, quantity: ci.quantity + 1 } : ci)
+        : [...cart, { bookId: id, quantity: 1 }];
+      saveCartToStorage(userId, newCart);
+
+      return updated;
+    });
   };
 
   const removeFromCart = (id) => {
-    setData(prev => prev.map(item =>
-      item.id === id
-        ? {
-            ...item,
-            addedAmount: Math.max(item.addedAmount - 1, 0),
-            addedToCart: item.addedAmount - 1 > 0
-          }
-        : item
-    ));
+    setData(prev => {
+      const updated = prev.map(item =>
+        item.id === id
+          ? {
+              ...item,
+              addedAmount: Math.max(item.addedAmount - 1, 0),
+              addedToCart: item.addedAmount - 1 > 0
+            }
+          : item
+      );
+
+      const userId = getCurrentUserId();
+      const cart = getCartFromStorage(userId);
+      const exists = cart.find(ci => ci.bookId === id);
+      let newCart;
+      if (!exists) {
+        newCart = cart;
+      } else if (exists.quantity <= 1) {
+        newCart = cart.filter(ci => ci.bookId !== id);
+      } else {
+        newCart = cart.map(ci => ci.bookId === id ? { ...ci, quantity: ci.quantity - 1 } : ci);
+      }
+      saveCartToStorage(userId, newCart);
+
+      return updated;
+    });
   };
 
   const becomeFavorite = (id) => {

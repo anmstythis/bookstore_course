@@ -8,10 +8,50 @@ import { motion } from "framer-motion";
 const Cart = () => {
     const [data, setData] = useState([]);
 
+  const getCurrentUserId = () => {
+    try {
+      const userRaw = localStorage.getItem('user');
+      if (!userRaw) return null;
+      const parsed = JSON.parse(userRaw);
+      return parsed?.id_user || null;
+    } catch {
+      return null;
+    }
+  };
+
+  const getCartFromStorage = (userId) => {
+    if (!userId) return [];
+    try {
+      const raw = localStorage.getItem(`cart:${userId}`);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  };
+
   useEffect(() => {
-    axios.get('http://localhost:3001/media')
-      .then(res => setData(res.data))
-      .catch(err => console.log(err));
+    const fetchAll = async () => {
+      try {
+        const [booksRes] = await Promise.all([
+          axios.get('http://localhost:5000/api/books')
+        ]);
+        const books = booksRes.data || [];
+        const userId = getCurrentUserId();
+        const cart = getCartFromStorage(userId);
+        const cartByBookId = new Map(cart.map(ci => [ci.bookId, ci.quantity]));
+        const mapped = books.map(b => ({
+          id: b.id_book,
+          name: b.title,
+          price: Number(b.price),
+          addedAmount: cartByBookId.get(b.id_book) || 0,
+          addedToCart: cartByBookId.has(b.id_book)
+        }));
+        setData(mapped);
+      } catch (err) {
+        console.log(err);
+      }
+    };
+    fetchAll();
   }, []);
 
   const calculateTotalPrice = () => {
@@ -21,7 +61,7 @@ const Cart = () => {
   };
 
   const BuyOption = () => {
-    if (calculateTotalPrice() != 0)
+    if (calculateTotalPrice() !== 0)
         {
             return <motion.div
             initial={{x:1000, opacity:0}}
@@ -34,26 +74,35 @@ const Cart = () => {
         }
   }
 
-  const Sold = () => {
-    const itemsInCart = data.filter(item => item.addedToCart === true);
+  const Sold = async () => {
+    try {
+      const userId = getCurrentUserId();
+      if (!userId) return;
+      const cart = getCartFromStorage(userId);
+      if (cart.length === 0) return;
 
-    const updatedItems = itemsInCart.map(item => {
-      const updatedItem = { ...item, addedAmount: 0, addedToCart: false };
-      axios.put(`http://localhost:3001/media/${item.id}`, updatedItem)
-        .then(response => {
-          console.log(`Updated item ${item.id}`, response.data);
-          window.location.reload();
-        })
-        .catch(err => console.error(err));
-      return updatedItem;
-    });
+      const orderPayload = {
+        user_id: userId,
+        status_id: 1,
+        deliverytype_id: 1,
+        address_id: 1,
+        items: cart.map(ci => ({ book_id: ci.bookId, quantity: ci.quantity, price: (data.find(d => d.id === ci.bookId)?.price) || 0 }))
+      };
+
+      await axios.post('http://localhost:5000/api/orders', orderPayload);
+
+      localStorage.setItem(`cart:${userId}`, JSON.stringify([]));
+      window.location.reload();
+    } catch (err) {
+      console.error(err);
+    }
   }
 
     return (
         <div>
             <Header
                 title="Корзина"
-                description={ calculateTotalPrice() != 0 ? "Вы еще не передумали покупать книги? Так купите их прямо сейчас!" : "В корзине пусто."}
+                description={ calculateTotalPrice() !== 0 ? "Вы еще не передумали покупать книги? Так купите их прямо сейчас!" : "В корзине пусто."}
             />
             <motion.div
                 initial={{x:-1000, opacity:0}}
