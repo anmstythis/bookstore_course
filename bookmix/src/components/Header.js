@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getCurrentUser } from '../utils/userUtils.js'
+import { getCartFromStorage } from '../utils/cartUtils.js'
 import axios from 'axios';
 
 const Header = ({title, description}) =>
@@ -7,14 +9,26 @@ const Header = ({title, description}) =>
     const navigate = useNavigate();
     const menuRef = useRef(null);
 
+    const user = getCurrentUser();
+
     const handleButtonClick = () => {
         navigate("/cart");
     };
 
-    const [data, setData] = useState([]);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [isCartNotEmpty, setIsCartNotEmpty] = useState(getCartFromStorage().length > 0);
 
-    const isCartNotEmpty = data.some(item => item.addedToCart === true);
+    useEffect(() => {
+        const handleStorageChange = () => {
+        const cart = getCartFromStorage();
+        setIsCartNotEmpty(cart.length > 0);
+        };
+
+        window.addEventListener('storage', handleStorageChange);
+        return () => window.removeEventListener('storage', handleStorageChange);
+    }, []);
+
+    console.log(isCartNotEmpty);
 
     const toggleMenu = () => {
         setIsMenuOpen(prev => !prev);
@@ -29,6 +43,11 @@ const Header = ({title, description}) =>
         setIsMenuOpen(false);
         navigate('/settings');
     };
+
+    const handleNavigateOrders = () => {
+        setIsMenuOpen(false);
+        navigate('/orders');
+    }
 
     const handleLogout = () => {
         setIsMenuOpen(false);
@@ -61,7 +80,8 @@ const Header = ({title, description}) =>
                     {isMenuOpen && (
                         <div className="menuDropdown" role="menu">
                             <button className="menuItem" onClick={handleNavigateAccount} role="menuitem">Учетная запись</button>
-                            <button className="menuItem" onClick={handleNavigateSettings} role="menuitem">Настройки</button>
+                            <button className="menuItem" onClick={user.role_id === 1 ? handleNavigateSettings : handleNavigateOrders} 
+                                role="menuitem">{user.role_id === 1 ? 'Настройки' : 'Заказы'}</button>
                             <button className="menuItem menuItemDanger" onClick={handleLogout} role="menuitem">Выйти</button>
                         </div>
                     )}

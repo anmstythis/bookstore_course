@@ -13,6 +13,7 @@ const Card = ({ head, term, route, onCartChange }) => {
         ? { ...item, addedToCart: true, addedAmount: item.addedAmount + 1 }
         : item
     ));
+    window.dispatchEvent(new Event("storage"));
     if (typeof onCartChange === 'function') onCartChange(newCart);
   };
 
@@ -23,6 +24,7 @@ const Card = ({ head, term, route, onCartChange }) => {
         ? { ...item, addedAmount: Math.max(item.addedAmount - 1, 0), addedToCart: item.addedAmount - 1 > 0 }
         : item
     ));
+    window.dispatchEvent(new Event("storage"));
     if (typeof onCartChange === 'function') onCartChange(newCart);
   };
 

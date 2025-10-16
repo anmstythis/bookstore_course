@@ -284,23 +284,27 @@ u
 .cartEmpty,
 .cartFull 
 {
-  height: 60px;
-  width: 60px;
+  height: 40px;
+  width: 40px;
   font-size: 40pt;
   margin-right: 40px;
+  margin-top: 10px;
   justify-self: end;
+  text-align: center;
   grid-column: 3;
+  background: transparent;
 }
 
 .cartEmpty
 {
-  background: transparent;
   border: 0;
 }
 
 .cartFull
 {
+  background-color: rgb(87, 44, 33);
   border: rgb(87, 44, 33);
+  border-radius: 50px;
 }
 
 /* --МЕНЮ--- */
