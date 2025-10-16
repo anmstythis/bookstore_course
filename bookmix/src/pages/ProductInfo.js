@@ -168,6 +168,8 @@ const ProductInfo = () => {
       ? cart.map(ci => ci.bookId === book.id ? { ...ci, quantity: ci.quantity + 1 } : ci)
       : [...cart, { bookId: book.id, quantity: 1 }];
     saveCartToStorage(userId, newCart);
+    console.log('добавлено:', { userId, cart: newCart });
+    window.location.reload();
 
     const updated = {
       ...book,
@@ -191,6 +193,7 @@ const ProductInfo = () => {
       newCart = cart.map(ci => ci.bookId === book.id ? { ...ci, quantity: ci.quantity - 1 } : ci);
     }
     saveCartToStorage(userId, newCart);
+    console.log('удалено:', { userId, cart: newCart });
 
     const updatedAmount = Math.max((book.addedAmount || 0) - 1, 0);
     const updated = {

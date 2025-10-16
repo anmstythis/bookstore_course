@@ -116,16 +116,6 @@ export default {
 					id_order: { type: 'integer' } 
 				} 
 			},
-			OrderDetail: { 
-				type: 'object', 
-				properties: { 
-					id_orderdetail: { type: 'integer' }, 
-					order_id: { type: 'integer' }, 
-					price: { type: 'number' }, 
-					quantity: { type: 'integer' }, 
-					book_id: { type: 'integer' } 
-				} 
-			},
 			Review: { 
 				type: 'object', 
 				properties: { 
@@ -470,87 +460,159 @@ export default {
 			},
 			},
 		'/api/orders': {
-			get: { 
-				summary: 'Все заказы', 
+			get: {
+				summary: 'Все заказы',
 				tags: ['Заказы'],
-				responses: { 
-					200: { 
-						description: 'OK' 
-					} 
-				} 
+				responses: {
+				200: {
+					description: 'OK'
+				},
+				500: {
+					description: 'Ошибка сервера'
+				}
+				}
 			},
-			post: { 
-				summary: 'Создать заказ', 
+			post: {
+				summary: 'Создать заказ',
 				tags: ['Заказы'],
-				requestBody: { 
-					required: true, 
-					content: { 'application/json': { 
-						schema: { type: 'object', 
-							properties: { 
-								user_id: { type: 'integer' }, 
-								status_id: { type: 'integer' }, 
-								deliverytype_id: { type: 'integer' }, 
-								address_id: { type: 'integer' }, 
-								items: { 
-									type: 'array', 
-									items: { 
-										type: 'object', 
-										properties: { 
-											book_id: { type: 'integer' }, 
-											quantity: { type: 'integer' }, 
-											price: { type: 'number' } }, 
-											required: ['book_id','quantity','price'] } } }, 
-											required: ['user_id','status_id','items'] } } } }, 
-				responses: { 
-					201: { 
-						description: 'Created' 
-					} 
-				} 
+				requestBody: {
+				required: true,
+				content: {
+					'application/json': {
+					schema: {
+						type: 'object',
+						properties: {
+						user_id: { type: 'integer' },
+						status_id: { type: 'integer' },
+						deliverytype_id: { type: 'integer' },
+						address_id: { type: 'integer' },
+						items: {
+							type: 'array',
+							items: {
+							type: 'object',
+							properties: {
+								book_id: { type: 'integer' },
+								quantity: { type: 'integer' },
+								price: { type: 'number' }
+							},
+							required: ['book_id', 'quantity', 'price']
+							}
+						}
+						},
+						required: ['user_id', 'status_id', 'items']
+					}
+					}
+				}
+				},
+				responses: {
+				201: {
+					description: 'Заказ успешно создан'
+				},
+				400: {
+					description: 'Некорректные данные'
+				},
+				500: {
+					description: 'Ошибка сервера'
+				}
+				}
 			}
-		},
-		'/api/orders/{id}': {
-			get: { 
-				summary: 'Заказ по id', 
+			},
+
+			'/api/orders/{id}': {
+			get: {
+				summary: 'Получить заказ по ID с деталями',
 				tags: ['Заказы'],
-				parameters: [{ 
-					name: 'id', 
-					in: 'path', 
-					required: true, 
-					schema: { type: 'integer' } }], 
-				responses: { 
-					200: { 
-						description: 'OK' 
-					}, 
-					404: { 
-						description: 'Not Found' 
-					} 
-				} 
-			}
-		},
-		'/api/orders/{id}/status': {
-			put: { 
-				summary: 'Обновить статус заказа', 
+				parameters: [
+				{
+					name: 'id',
+					in: 'path',
+					required: true,
+					schema: { type: 'integer' },
+					description: 'ID заказа'
+				}
+				],
+				responses: {
+				200: {
+					description: 'OK'
+				},
+				404: {
+					description: 'Заказ не найден'
+				},
+				500: {
+					description: 'Ошибка сервера'
+				}
+				}
+			},
+			delete: {
+				summary: 'Удалить заказ по ID',
 				tags: ['Заказы'],
-				parameters: [{ 
-					name: 'id', 
-					in: 'path', 
-					required: true, 
-					schema: { type: 'integer' } }], 
-				requestBody: { 
-					required: true, 
-					content: { 'application/json': { 
-						schema: { 
-							type: 'object', 
-							properties: { 
-								status_id: { type: 'integer' } }, 
-								required: ['status_id'] } } } }, 
-				responses: { 
-					200: { 
-						description: 'OK' 
-					} 
-				} 
+				parameters: [
+				{
+					name: 'id',
+					in: 'path',
+					required: true,
+					schema: { type: 'integer' },
+					description: 'ID заказа'
+				}
+				],
+				responses: {
+				200: {
+					description: 'Заказ успешно удалён'
+				},
+				404: {
+					description: 'Заказ не найден'
+				},
+				500: {
+					description: 'Ошибка сервера'
+				}
+				}
 			}
-		},
+			},
+
+			'/api/orders/{id}/status': {
+			put: {
+				summary: 'Обновить статус заказа',
+				tags: ['Заказы'],
+				parameters: [
+				{
+					name: 'id',
+					in: 'path',
+					required: true,
+					schema: { type: 'integer' },
+					description: 'ID заказа'
+				}
+				],
+				requestBody: {
+				required: true,
+				content: {
+					'application/json': {
+					schema: {
+						type: 'object',
+						properties: {
+						status_id: { type: 'integer' }
+						},
+						required: ['status_id']
+					}
+					}
+				}
+				},
+				responses: {
+				200: {
+					description: 'Статус успешно обновлён'
+				},
+				404: {
+					description: 'Заказ не найден'
+				},
+				400: {
+					description: 'Некорректные данные'
+				},
+				500: {
+					description: 'Ошибка сервера'
+				}
+				}
+			}
+			},
+
 		'/api/reviews/book/{bookId}': { 
 			get: { 
 				summary: 'Отзывы по книге', 
@@ -1189,76 +1251,6 @@ export default {
 			delete: { 
 				summary: 'Удалить издателя',
 				tags: ['Издатели'], 
-				parameters: [{ 
-					name: 'id', 
-					in: 'path', 
-					required: true, 
-					schema: { type: 'integer' } }], 
-				responses: { 
-					200: { 
-						description: 'Deleted' 
-					} 
-				} 
-			} 
-		},
-		'/api/orderdetails/order/{orderId}': { 
-			get: { 
-				summary: 'Детали заказа по Order_ID', 
-				tags: ['Заказы'],		
-				parameters: [{ 
-					name: 'orderId', 
-					in: 'path', 
-					required: true, 
-					schema: { type: 'integer' } }],
-				responses: { 
-					200: { 
-						description: 'OK' 
-					} 
-				} 
-			} 
-		},
-		'/api/orderdetails': { 
-			post: { 
-				summary: 'Создать позицию заказа',
-				tags: ['Заказы'], 
-				requestBody: { 
-					required: true, 
-					content: { 'application/json': { 
-						schema: { $ref: '#/components/schemas/OrderDetail' } } } }, 
-					responses: { 
-						201: { 
-							description: 'Created' 
-						} 
-					} 
-				} 
-			},
-		'/api/orderdetails/{id}': { 
-			put: { 
-				summary: 'Обновить позицию заказа', 
-				tags: ['Заказы'],
-				parameters: [{ 
-					name: 'id', 
-					in: 'path', 
-					required: true, 
-					schema: { type: 'integer' } }], 
-				requestBody: { 
-					required: true, 
-					content: { 'application/json': { 
-						schema: { 
-							type: 'object', 
-							properties: { 
-								price: { type: 'number' }, 
-								quantity: { type: 'integer' } },
-							required: ['price','quantity'] } } } }, 
-					responses: { 
-						200: { 
-							description: 'OK' 
-						} 
-					} 
-				}, 
-			delete: { 
-				summary: 'Удалить позицию заказа',
-				tags: ['Заказы'], 
 				parameters: [{ 
 					name: 'id', 
 					in: 'path', 

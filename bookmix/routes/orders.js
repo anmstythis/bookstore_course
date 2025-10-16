@@ -11,7 +11,8 @@ router.get('/', async (req, res) => {
        JOIN users u ON o.user_id = u.id_user
        JOIN statuses s ON o.status_id = s.id_status
        LEFT JOIN deliverytypes d ON o.deliverytype_id = d.id_deliverytype
-       LEFT JOIN addresses a ON o.address_id = a.id_address`
+       LEFT JOIN addresses a ON o.address_id = a.id_address
+       ORDER BY o.id_order DESC`
     );
     res.json(result.rows);
   } catch (err) {
@@ -23,7 +24,8 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const order = await pool.query(`SELECT * FROM orders WHERE id_order=$1`, [req.params.id]);
-    if (order.rows.length === 0) return res.status(404).json({ error: "Заказ не найден" });
+    if (order.rows.length === 0)
+      return res.status(404).json({ error: "Заказ не найден" });
 
     const details = await pool.query(
       `SELECT od.id_orderdetail, b.title, od.price, od.quantity 
@@ -54,7 +56,8 @@ router.post('/', async (req, res) => {
 
     for (let item of items) {
       await pool.query(
-        `INSERT INTO orderdetails (order_id, price, quantity, book_id) VALUES ($1, $2, $3, $4)`,
+        `INSERT INTO orderdetails (order_id, price, quantity, book_id) 
+         VALUES ($1, $2, $3, $4)`,
         [orderId, item.price, item.quantity, item.book_id]
       );
     }
@@ -73,8 +76,28 @@ router.put('/:id/status', async (req, res) => {
       `UPDATE orders SET status_id=$1 WHERE id_order=$2 RETURNING *`,
       [status_id, req.params.id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: "Заказ не найден" });
+    if (result.rows.length === 0)
+      return res.status(404).json({ error: "Заказ не найден" });
+
     res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// удалить заказ
+router.delete('/:id', async (req, res) => {
+  try {
+    const orderId = req.params.id;
+
+    const order = await pool.query(`SELECT * FROM orders WHERE id_order = $1`, [orderId]);
+    if (order.rows.length === 0)
+      return res.status(404).json({ error: "Заказ не найден" });
+
+    await pool.query(`DELETE FROM orderdetails WHERE order_id = $1`, [orderId]);
+    await pool.query(`DELETE FROM orders WHERE id_order = $1`, [orderId]);
+
+    res.json({ message: `Заказ с ID ${orderId} успешно удалён` });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

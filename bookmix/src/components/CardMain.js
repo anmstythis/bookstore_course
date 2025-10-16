@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import CardItem from './CardItem.js';
 
-const Card = ({ head, term, route }) => {
+const Card = ({ head, term, route, onCartChange }) => {
   const [data, setData] = useState([]);
 
   const getCurrentUserId = () => {
@@ -88,6 +88,10 @@ const Card = ({ head, term, route }) => {
         ? cart.map(ci => ci.bookId === id ? { ...ci, quantity: ci.quantity + 1 } : ci)
         : [...cart, { bookId: id, quantity: 1 }];
       saveCartToStorage(userId, newCart);
+      console.log('корзина после добавления товара:', { userId, cart: newCart });
+      if (typeof onCartChange === 'function') {
+        try { onCartChange(newCart); } catch {}
+      }
 
       return updated;
     });
@@ -117,6 +121,10 @@ const Card = ({ head, term, route }) => {
         newCart = cart.map(ci => ci.bookId === id ? { ...ci, quantity: ci.quantity - 1 } : ci);
       }
       saveCartToStorage(userId, newCart);
+      console.log('корзина после удаления товара:', { userId, cart: newCart });
+      if (typeof onCartChange === 'function') {
+        try { onCartChange(newCart); } catch {}
+      }
 
       return updated;
     });

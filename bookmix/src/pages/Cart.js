@@ -54,6 +54,15 @@ const Cart = () => {
     fetchAll();
   }, []);
 
+  const handleCartChange = (newCart) => {
+    const cartByBookId = new Map((newCart || []).map(ci => [ci.bookId, ci.quantity]));
+    setData(prev => prev.map(p => ({
+      ...p,
+      addedAmount: cartByBookId.get(p.id) || 0,
+      addedToCart: cartByBookId.has(p.id)
+    })));
+  };
+
   const calculateTotalPrice = () => {
     return data.reduce((total, item) => {
       return total + (item.addedAmount * item.price);
@@ -89,12 +98,16 @@ const Cart = () => {
         items: cart.map(ci => ({ book_id: ci.bookId, quantity: ci.quantity, price: (data.find(d => d.id === ci.bookId)?.price) || 0 }))
       };
 
+      console.log('создание заказа:', orderPayload);
       await axios.post('http://localhost:5000/api/orders', orderPayload);
+
+      console.log(orderPayload);
 
       localStorage.setItem(`cart:${userId}`, JSON.stringify([]));
       window.location.reload();
     } catch (err) {
-      console.error(err);
+      console.error('заказ не создан:', err?.response?.data || err);
+      alert(`Не удалось оформить заказ. Недостаточно экземпляров данной книги на складе.`);
     }
   }
 
@@ -112,6 +125,7 @@ const Cart = () => {
                 <Card
                     term = {d => d.addedToCart === true}
                     route="cart"
+                    onCartChange={handleCartChange}
                 />
             </motion.div>
             <BuyOption/>  
