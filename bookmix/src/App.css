@@ -652,3 +652,213 @@ u
 .table th[scope="row"] {
   text-align: left;
 }
+
+/* ---АДАПТИВНОСТЬ--- */
+@media (max-width: 1200px) {
+  .mainpage {
+    grid-template-columns: 1fr;
+  }
+
+  .welcome {
+    grid-column: 1;
+    font-size: 34pt;
+  }
+
+  .cards {
+    justify-content: center;
+  }
+
+  .head {
+    font-size: 18pt;
+  }
+}
+
+@media (max-width: 1024px) {
+  .card {
+    grid-template-columns: 1fr 100px;
+    grid-template-rows: auto auto auto auto;
+    width: 320px;
+    height: auto;
+  }
+
+  .card-img-top {
+    width: 100%;
+    height: auto;
+  }
+
+  .price {
+    align-self: center;
+  }
+
+  .buttons {
+    justify-self: end;
+  }
+
+  .menuButton {
+    height: 48px;
+    width: 48px;
+    font-size: 40pt;
+    margin-left: 20px;
+  }
+
+  .menuDropdown {
+    min-width: 160px;
+  }
+
+  .productInfoCard {
+    grid-template-columns: 0.3fr 0.7fr;
+  }
+
+  .titleProd,
+  .authorProd,
+  .countryProd,
+  .descrProd {
+    font-size: 18pt;
+  }
+}
+
+@media (max-width: 768px) {
+  .welcome {
+    font-size: 28pt;
+  }
+
+  .find {
+    font-size: 14pt;
+  }
+
+  .cataloguePage {
+    grid-template-columns: 1fr;
+    row-gap: 20px;
+  }
+
+  .listBooks {
+    order: 2;
+  }
+
+  .findPanel {
+    margin: 0 20px 10px 20px;
+  }
+
+  #search {
+    width: 100%;
+  }
+
+  .cards {
+    margin-left: 0;
+    justify-content: center;
+  }
+
+  .card {
+    width: 100%;
+    max-width: 360px;
+  }
+
+  .buyButton {
+    width: 90%;
+  }
+
+  .formInput {
+    width: 100%;
+  }
+
+  .formButton {
+    width: 100%;
+  }
+
+  .form {
+    margin: 0 20px;
+  }
+
+  .table {
+    font-size: 14pt;
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .productInfoCard {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+  }
+
+  .prodImg {
+    width: 200px;
+    justify-self: center;
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .titleProd,
+  .authorProd,
+  .countryProd,
+  .descrProd {
+    grid-column: 1;
+  }
+}
+
+@media (max-width: 480px) {
+  .welcome {
+    font-size: 22pt;
+    margin-top: 10px;
+    margin-bottom: 10px;
+  }
+
+  .head {
+    font-size: 16pt;
+    margin-left: 10px;
+  }
+
+  .foot,
+  .foot2,
+  .total {
+    font-size: 14pt;
+    margin-right: 20px;
+    margin-left: 20px;
+  }
+
+  .menuButton {
+    height: 40px;
+    width: 40px;
+    font-size: 32pt;
+    margin-left: 10px;
+  }
+
+  .cartEmpty,
+  .cartFull {
+    margin-right: 10px;
+  }
+
+  .card {
+    max-width: 320px;
+  }
+
+  .card-title {
+    font-size: 16pt;
+  }
+
+  .card-text {
+    font-size: 12pt;
+  }
+
+  .price {
+    font-size: 14pt;
+  }
+
+  .buyButton {
+    width: calc(100% - 40px);
+    margin-left: 20px;
+  }
+
+  .formInput,
+  .formButton {
+    width: 100%;
+  }
+
+  .formLabel {
+    font-size: 14pt;
+  }
+
+  .menuDropdown {
+    min-width: 140px;
+  }
+}
