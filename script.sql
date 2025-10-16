@@ -481,10 +481,23 @@ AFTER INSERT OR UPDATE OR DELETE ON Users
 FOR EACH ROW
 EXECUTE FUNCTION log_changes();
 
+-- ЛОГИРОВАНИЕ АККАУНТОВ
+CREATE TRIGGER trg_accounts_audit
+AFTER INSERT OR UPDATE OR DELETE ON Accounts
+FOR EACH ROW
+EXECUTE FUNCTION log_changes();
+
 -- ЛОГИРОВАНИЕ ЗАКАЗОВ
 CREATE TRIGGER trg_orders_audit
 AFTER INSERT OR UPDATE OR DELETE ON Orders
 FOR EACH ROW
 EXECUTE FUNCTION log_changes();
+
+-- ЛОГИРОВАНИЕ ОТЗЫВОВ
+CREATE TRIGGER trg_reviews_audit
+AFTER INSERT OR UPDATE OR DELETE ON Reviews
+FOR EACH ROW
+EXECUTE FUNCTION log_changes();
+
 
 SELECT *FROM AuditLog
