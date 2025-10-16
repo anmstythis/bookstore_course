@@ -424,5 +424,67 @@ WHERE id_publisher = 1; --проверка номера телефона
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
+-- ЖУРНАЛ АУДИТА
+CREATE TABLE AuditLog (
+    ID_Audit SERIAL PRIMARY KEY,
+    TableName TEXT NOT NULL,         -- В какой таблице было изменение
+    Record_ID INT,                   -- ID изменённой записи
+    Action TEXT NOT NULL,            -- INSERT / UPDATE / DELETE
+    ChangedBy TEXT,                  -- Кто изменил (логин, email или системное имя)
+    ChangedAt TIMESTAMP DEFAULT NOW(),
+    OldValue JSONB,                  -- Старые данные
+    NewValue JSONB                   -- Новые данные
+);
 
+-- ФУНКЦИЯ ДЛЯ ЛОГИРОВАНИЯ
+CREATE OR REPLACE FUNCTION log_changes()
+RETURNS TRIGGER AS $$
+DECLARE
+  key_field TEXT;
+  key_value INT;
+BEGIN
+  SELECT column_name INTO key_field
+  FROM information_schema.columns
+  WHERE table_name = TG_TABLE_NAME
+    AND column_name ILIKE 'id_%'
+  LIMIT 1;
 
+  IF TG_OP = 'UPDATE' THEN
+    EXECUTE format('SELECT ($1).%I', key_field) INTO key_value USING NEW;
+    INSERT INTO AuditLog (TableName, Record_ID, Action, ChangedBy, OldValue, NewValue)
+    VALUES (TG_TABLE_NAME, key_value, 'UPDATE', current_user, row_to_json(OLD), row_to_json(NEW));
+
+  ELSIF TG_OP = 'DELETE' THEN
+    EXECUTE format('SELECT ($1).%I', key_field) INTO key_value USING OLD;
+    INSERT INTO AuditLog (TableName, Record_ID, Action, ChangedBy, OldValue)
+    VALUES (TG_TABLE_NAME, key_value, 'DELETE', current_user, row_to_json(OLD));
+
+  ELSIF TG_OP = 'INSERT' THEN
+    EXECUTE format('SELECT ($1).%I', key_field) INTO key_value USING NEW;
+    INSERT INTO AuditLog (TableName, Record_ID, Action, ChangedBy, NewValue)
+    VALUES (TG_TABLE_NAME, key_value, 'INSERT', current_user, row_to_json(NEW));
+  END IF;
+
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ЛОГИРОВАНИЕ КНИГ
+CREATE TRIGGER trg_books_audit
+AFTER INSERT OR UPDATE OR DELETE ON Books
+FOR EACH ROW
+EXECUTE FUNCTION log_changes();
+
+-- ЛОГИРОВАНИЕ ПОЛЬЗОВАТЕЛЕЙ
+CREATE TRIGGER trg_users_audit
+AFTER INSERT OR UPDATE OR DELETE ON Users
+FOR EACH ROW
+EXECUTE FUNCTION log_changes();
+
+-- ЛОГИРОВАНИЕ ЗАКАЗОВ
+CREATE TRIGGER trg_orders_audit
+AFTER INSERT OR UPDATE OR DELETE ON Orders
+FOR EACH ROW
+EXECUTE FUNCTION log_changes();
+
+SELECT *FROM AuditLog
