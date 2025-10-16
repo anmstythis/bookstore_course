@@ -1,6 +1,6 @@
 import React from 'react';
 
-const FormWrapper = ({
+const Form = ({
   children,
   onSubmit,
   loading = false,
@@ -23,6 +23,6 @@ const FormWrapper = ({
   );
 };
 
-export default FormWrapper;
+export default Form;
 
 

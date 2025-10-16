@@ -72,6 +72,11 @@ const Account = () =>
     }
   };
 
+  const handleDeleteAccount = () => {
+    if (!storedUser) return;
+    navigate('/account/delete');
+  };
+
   if (!storedUser)
   {
     return (
@@ -231,6 +236,15 @@ const Account = () =>
           </tr>
         </tbody>
       </table>
+
+      <div className='formContainer'>
+        <button
+          className="menuItemDanger"
+          onClick={handleDeleteAccount}
+        >
+         Удалить аккаунт
+        </button>
+      </div>
 
     </div>
   );

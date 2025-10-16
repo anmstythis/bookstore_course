@@ -38,12 +38,6 @@ u
   color: #ffffff;
 }
 
-.mainpage
-{
-  display: grid;
-  grid-template-columns: 0.5fr 2fr 0.5fr;
-}
-
 .welcome 
 {
   color: #ffffff;
@@ -328,7 +322,7 @@ u
   background-color: #887756;
   border: 1px solid #4d4431;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
-  min-width: 180px;
+  max-width: 200px;
   padding: 8px 0;
   z-index: 100;
   animation: fadeIn 0.15s ease-in-out;
@@ -718,12 +712,14 @@ u
 
 /* ---АДАПТИВНОСТЬ--- */
 @media (max-width: 1200px) {
-  .mainpage {
-    grid-template-columns: 1fr;
+  .mainpage
+  {
+    display: grid;
+    grid-template-columns: 0.5fr 2fr 0.5fr;
   }
 
   .welcome {
-    grid-column: 1;
+    grid-column: 2;
     font-size: 34pt;
   }
 

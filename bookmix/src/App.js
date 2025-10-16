@@ -10,6 +10,7 @@ import Login from './pages/Login.js';
 import Register from './pages/Register.js';
 import Account from './pages/Account.js'
 import PasswordReset from './pages/PasswordReset.js';
+import DeleteAccountConfirm from './pages/DeleteAccountConfirm.js';
 
 
 class App extends React.Component
@@ -27,6 +28,7 @@ class App extends React.Component
           <Route path="/login" element={!user ? <Login /> : <Navigate to="/" replace/>}/>
           <Route path="/register" element={<Register />}/>
           <Route path="/account" element={<Account />}/>
+          <Route path="/account/delete" element={<DeleteAccountConfirm />}/>
           <Route path="/reset-password" element={<PasswordReset/>}/>
         </Routes>
       </div>
