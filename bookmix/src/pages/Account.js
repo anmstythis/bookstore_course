@@ -2,6 +2,7 @@ import React, { useMemo, useState} from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Header from '../components/Header.js';
 import axios from 'axios';
+import Footer from '../components/Footer.js';
 
 const Account = () =>
 {
@@ -245,7 +246,7 @@ const Account = () =>
          Удалить аккаунт
         </button>
       </div>
-
+      <Footer/>
     </div>
   );
 }
