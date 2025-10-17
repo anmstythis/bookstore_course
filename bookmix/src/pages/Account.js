@@ -1,52 +1,46 @@
-import React, { useMemo, useState} from 'react';
+import React, { useState} from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Header from '../components/Header.js';
-import axios from 'axios';
 import Footer from '../components/Footer.js';
+import { getCurrentUser } from '../utils/userUtils.js';
+import api from '../axiosSetup.js'
+
 
 const Account = () =>
 {
   const navigate = useNavigate();
 
-  const storedUser = useMemo(() => {
-    try {
-      const userString = localStorage.getItem('user');
-      console.log(JSON.parse(userString));
-      return userString ? JSON.parse(userString) : null;
-    } catch (e) {
-      return null;
-    }
-  }, []);
-
   const [editingField, setEditingField] = useState(null);
 
-  const [login, setLogin] = useState(storedUser?.login);
-  const [email, setEmail] = useState(storedUser?.email);
-  const [lastname, setLastname] = useState(storedUser?.lastname);
-  const [firstname, setFirstname] = useState(storedUser?.firstname);
-  const [patronymic, setPatronymic] = useState(storedUser?.patronymic);
+  const [login, setLogin] = useState(getCurrentUser()?.login);
+  const [email, setEmail] = useState(getCurrentUser()?.email);
+  const [lastname, setLastname] = useState(getCurrentUser()?.lastname);
+  const [firstname, setFirstname] = useState(getCurrentUser()?.firstname);
+  const [patronymic, setPatronymic] = useState(getCurrentUser()?.patronymic);
 
   const handleEditClick = (field) => {
     setEditingField(field);
   };
 
+  console.log(getCurrentUser());
+
   const saveChanges = async () => {
     try {
-      const userResponse = await axios.put(`http://localhost:5000/api/users/${storedUser.id_user}`, {
+      const userResponse = await api.put(`/users/${getCurrentUser().id_user}`, {
         lastname,
         firstname,
         patronymic,
         email,
       });
 
-      if (login !== storedUser.login) {
-        await axios.patch(`http://localhost:5000/api/accounts/${storedUser.id_account}`, {
+      if (login !== getCurrentUser().login) {
+        await api.patch(`/accounts/${getCurrentUser().id_account}`, {
           login,
         });
       }
 
       const updatedUser = {
-        ...storedUser,
+        ...getCurrentUser(),
         lastname,
         firstname,
         patronymic,
@@ -74,11 +68,11 @@ const Account = () =>
   };
 
   const handleDeleteAccount = () => {
-    if (!storedUser) return;
+    if (!getCurrentUser()) return;
     navigate('/account/delete');
   };
 
-  if (!storedUser)
+  if (!getCurrentUser())
   {
     return (
       <div>
@@ -232,7 +226,7 @@ const Account = () =>
 
           <tr>
             <th scope="row">Роль</th>
-            <td>{storedUser.rolename}</td>
+            <td>{getCurrentUser().rolename}</td>
             <td></td>
           </tr>
         </tbody>

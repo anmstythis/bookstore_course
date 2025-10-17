@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getCurrentUser } from '../utils/userUtils.js'
 import { getCartFromStorage } from '../utils/cartUtils.js'
-import axios from 'axios';
 
 const Header = ({title, description}) =>
 {

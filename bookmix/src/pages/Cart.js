@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import Card from '../components/CardMain.js';
 import Footer from '../components/Footer.js';
 import Header from '../components/Header.js';
@@ -8,6 +7,7 @@ import { motion } from 'framer-motion';
 import { getCurrentUserId } from '../utils/userUtils.js';
 import { getCartFromStorage, saveCartToStorage } from '../utils/cartUtils.js';
 import { useBooksData } from '../utils/booksUtils.js';
+import api from '../axiosSetup.js'
 
 const Cart = () => {
   const { data, setData } = useBooksData();
@@ -28,7 +28,7 @@ const Cart = () => {
   useEffect(() => {
     const fetchDeliveryTypes = async () => {
       try {
-        const response = await axios.get('http://localhost:5000/api/deliverytypes');
+        const response = await api.get('/deliverytypes');
         setDeliveryTypes(response.data);
       } catch (err) {
         console.error('Ошибка загрузки типов доставки:', err);
@@ -65,7 +65,7 @@ const Cart = () => {
       let addressId = null;
       
       if (!isPickup) {
-        const addressRes = await axios.post('http://localhost:5000/api/addresses', address);
+        const addressRes = await api.post('/addresses', address);
         addressId = addressRes.data.id_address;
       }
 
@@ -82,7 +82,7 @@ const Cart = () => {
       };;
 
       console.log('Создание заказа:', orderPayload);
-      await axios.post('http://localhost:5000/api/orders', orderPayload);
+      await api.post('/orders', orderPayload);
 
       saveCartToStorage([]);
       window.location.reload();

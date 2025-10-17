@@ -441,6 +441,7 @@ RETURNS TRIGGER AS $$
 DECLARE
   key_field TEXT;
   key_value INT;
+  user_login TEXT;
 BEGIN
   SELECT column_name INTO key_field
   FROM information_schema.columns
@@ -448,20 +449,27 @@ BEGIN
     AND column_name ILIKE 'id_%'
   LIMIT 1;
 
+  BEGIN
+    user_login := current_setting('app.current_user', true);
+  EXCEPTION
+    WHEN others THEN
+      user_login := 'anonymous';
+  END;
+
   IF TG_OP = 'UPDATE' THEN
     EXECUTE format('SELECT ($1).%I', key_field) INTO key_value USING NEW;
     INSERT INTO AuditLog (TableName, Record_ID, Action, ChangedBy, OldValue, NewValue)
-    VALUES (TG_TABLE_NAME, key_value, 'UPDATE', current_user, row_to_json(OLD), row_to_json(NEW));
+    VALUES (TG_TABLE_NAME, key_value, 'UPDATE', user_login, row_to_json(OLD), row_to_json(NEW));
 
   ELSIF TG_OP = 'DELETE' THEN
     EXECUTE format('SELECT ($1).%I', key_field) INTO key_value USING OLD;
     INSERT INTO AuditLog (TableName, Record_ID, Action, ChangedBy, OldValue)
-    VALUES (TG_TABLE_NAME, key_value, 'DELETE', current_user, row_to_json(OLD));
+    VALUES (TG_TABLE_NAME, key_value, 'DELETE', user_login, row_to_json(OLD));
 
   ELSIF TG_OP = 'INSERT' THEN
     EXECUTE format('SELECT ($1).%I', key_field) INTO key_value USING NEW;
     INSERT INTO AuditLog (TableName, Record_ID, Action, ChangedBy, NewValue)
-    VALUES (TG_TABLE_NAME, key_value, 'INSERT', current_user, row_to_json(NEW));
+    VALUES (TG_TABLE_NAME, key_value, 'INSERT', user_login, row_to_json(NEW));
   END IF;
 
   RETURN NULL;

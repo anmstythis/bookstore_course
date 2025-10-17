@@ -1,5 +1,10 @@
 import express from 'express';
 import cors from 'cors';
+import pool from './db.js';
+
+import swaggerUi from 'swagger-ui-express';
+import swaggerSpec from './swagger.js';
+
 import booksRouter from './routes/books.js';
 import usersRouter from './routes/users.js';
 import ordersRouter from './routes/orders.js';
@@ -13,12 +18,23 @@ import authorsRouter from './routes/authors.js';
 import categoriesRouter from './routes/categories.js';
 import publishersRouter from './routes/publishers.js';
 import authRoutes from './routes/auth.js';
-import swaggerUi from 'swagger-ui-express';
-import swaggerSpec from './swagger.js';
+
 
 const app = express();
-app.use(cors());
 app.use(express.json());
+
+app.use(cors());
+
+app.use(async (req, res, next) => {
+  const userLogin = req.header("X-User-Login") || "anonymous";
+  try {
+    await pool.query(`SELECT set_config('app.current_user', $1, false);`, [userLogin]);
+    console.log('Установлен текущий пользователь для сессии:', userLogin);
+  } catch (err) {
+    console.error('Ошибка при установке пользователя:', err.message);
+  }
+  next();
+});
 
 // Swagger UI
 app.use('/swagger', swaggerUi.serve, swaggerUi.setup(swaggerSpec));

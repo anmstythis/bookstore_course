@@ -46,14 +46,12 @@ const Orders = () => {
 
   return (
     <div>
-      <Header title={'Мои заказы'} description={'Список всех ваших заказов'} />
+      <Header title={'Мои заказы'} description={orders.length === 0 ? 'У вас пока нет заказов.' : 'Список всех ваших заказов'} />
 
       {loading ? (
         <div className="welcome">Загрузка заказов...</div>
       ) : error ? (
         <div className="formError">Ошибка: {error}</div>
-      ) : orders.length === 0 ? (
-        <div className="welcome">У вас пока нет заказов.</div>
       ) : (
         <table className="table">
           <thead>
