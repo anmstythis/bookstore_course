@@ -130,7 +130,6 @@ INSERT INTO Addresses (Country, City, Street, House, Apartment, Indexmail) VALUE
 -- Типы доставки
 INSERT INTO DeliveryTypes (TypeName) VALUES
 ('Курьер'),
-('Почта'),
 ('Самовывоз');
 
 -- Статусы заказов

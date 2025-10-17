@@ -612,6 +612,49 @@ export default {
 				}
 			}
 			},
+		'/api/orders/user/{id}': {
+			get: {
+				summary: 'Получить все заказы пользователя',
+				tags: ['Заказы'],
+				parameters: [
+				{
+					name: 'id',
+					in: 'path',
+					required: true,
+					schema: { type: 'integer' },
+					description: 'ID пользователя'
+				}
+				],
+				responses: {
+				200: {
+					description: 'Список заказов пользователя',
+					content: {
+					'application/json': {
+						schema: {
+						type: 'array',
+						items: {
+							type: 'object',
+							properties: {
+							id_order: { type: 'integer', example: 12 },
+							orderdate: { type: 'string', format: 'date-time', example: '2025-10-17T12:34:56Z' },
+							status_name: { type: 'string', example: 'В обработке' },
+							totalprice: { type: 'number', example: 1599.99 }
+							}
+						}
+						}
+					}
+					}
+				},
+				404: {
+					description: 'Пользователь не найден или у него нет заказов'
+				},
+				500: {
+					description: 'Ошибка сервера'
+				}
+				}
+			}
+			},
+
 
 		'/api/reviews/book/{bookId}': { 
 			get: { 
