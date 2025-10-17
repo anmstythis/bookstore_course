@@ -27,8 +27,6 @@ const Header = ({title, description}) =>
         return () => window.removeEventListener('storage', handleStorageChange);
     }, []);
 
-    console.log(isCartNotEmpty);
-
     const toggleMenu = () => {
         setIsMenuOpen(prev => !prev);
     };

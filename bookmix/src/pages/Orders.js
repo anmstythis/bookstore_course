@@ -1,8 +1,8 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Header from '../components/Header.js';
 import Footer from '../components/Footer.js';
-import { getCurrentUser } from '../utils/userUtils.js';
+import { getCurrentUser, getCurrentUserId } from '../utils/userUtils.js';
 import api from '../axiosSetup.js';
 
 const Orders = () => {
@@ -10,28 +10,48 @@ const Orders = () => {
   const [orders, setOrders] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [cancelingId, setCancelingId] = useState(null);
 
-  const user = useMemo(() => getCurrentUser(), []);
+  const fetchOrders = async () => {
+    if (!getCurrentUser()) return;
+
+    try {
+      const res = await api.get(`/orders/user/${getCurrentUserId()}`);
+      setOrders(res.data || []);
+    } catch (err) {
+      console.error('Ошибка при получении заказов:', err);
+      setError('Не удалось загрузить заказы.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchOrders = async () => {
-      if (!user) return;
-
-      try {
-        const res = await api.get(`/orders/user/${user.id_user}`);
-        setOrders(res.data || []);
-      } catch (err) {
-        console.error('Ошибка при получении заказов:', err);
-        setError('Не удалось загрузить заказы.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchOrders();
-  }, [user]);
+  }, [getCurrentUser()])
 
-  if (!user) {
+  const cancelOrder = async (id) => {
+    if (!getCurrentUser()) {
+      setError('Необходимо войти, чтобы отменять заказы');
+      return;
+    }
+    if (!window.confirm('Вы действительно хотите отменить этот заказ?')) return;
+
+    try {
+      setCancelingId(id);
+      await api.put(`/orders/${id}/status`, { status_id: 3 });
+
+      await fetchOrders(); 
+    } catch (err) {
+      console.error('Ошибка при отмене заказа:', err);
+      setError('Не удалось отменить заказ');
+    } finally {
+      setCancelingId(null);
+    }
+  };
+
+
+  if (!getCurrentUser()) {
     return (
       <div>
         <Header title={'Мои заказы'} description={'Вы не вошли в систему'} />
@@ -77,6 +97,17 @@ const Orders = () => {
                   >
                     Подробнее
                   </button>
+                </td>
+                <td>
+                  {order.status_name !== 'Отменён' && (
+                    <button
+                      className="reviewDeleteBtn"
+                      onClick={() => cancelOrder(order.id_order)}
+                      disabled={cancelingId === order.id_order}
+                    >
+                      {cancelingId === order.id_order ? '…' : '✕'}
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}

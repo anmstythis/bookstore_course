@@ -135,7 +135,6 @@ INSERT INTO DeliveryTypes (TypeName) VALUES
 -- Статусы заказов
 INSERT INTO Statuses (Status) VALUES
 ('Новый'),
-('Оплачен'),
 ('Доставлен'),
 ('Отменён');
 

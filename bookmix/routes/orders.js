@@ -113,6 +113,7 @@ router.put('/:id/status', async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
+    console.error("Ошибка при обновлении статуса заказа:", err)
     res.status(500).json({ error: err.message });
   }
 });

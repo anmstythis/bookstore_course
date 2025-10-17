@@ -7,15 +7,9 @@ const api = axios.create({
 
 api.interceptors.request.use((config) => {
 
-  const user = getCurrentUser();
-  console.log('getCurrentUser():', user);
+  if (getCurrentUser()?.login) 
+    config.headers["X-User-Login"] = getCurrentUser().login; 
 
-  if (user?.login) {
-    config.headers["X-User-Login"] = user.login; 
-    console.log(config.headers);
-  } else {
-    console.log('Нет логина, не добавлен заголовок X-User-Login');
-  }
 
   return config;
 });

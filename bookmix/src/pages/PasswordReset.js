@@ -28,7 +28,7 @@ const ResetPassword = () => {
 
     setLoading(true);
     try {
-        if (storedUser)
+        if (getCurrentUser())
         {
             await api.patch(`/accounts/${getCurrentUser().id_account}`, {password, });
         }
@@ -64,7 +64,7 @@ const ResetPassword = () => {
           submitLabel={'Сбросить пароль'}
           loadingLabel={'Обновляем...'}
         >
-            {!storedUser && (
+            {!getCurrentUser() && (
             <>
               <label className="formLabel">Логин</label>
               <input
@@ -117,7 +117,7 @@ const ResetPassword = () => {
         </Form>
 
        <div className="hint">
-        {storedUser ? (
+        {getCurrentUser() ? (
             <>
             Вернуться к <Link className="redirectLink" to="/account">профилю</Link>
             </>

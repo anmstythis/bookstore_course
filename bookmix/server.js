@@ -29,7 +29,6 @@ app.use(async (req, res, next) => {
   const userLogin = req.header("X-User-Login") || "anonymous";
   try {
     await pool.query(`SELECT set_config('app.current_user', $1, false);`, [userLogin]);
-    console.log('Установлен текущий пользователь для сессии:', userLogin);
   } catch (err) {
     console.error('Ошибка при установке пользователя:', err.message);
   }

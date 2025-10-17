@@ -1,4 +1,3 @@
-import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import Footer from '../components/Footer.js';
 import Header from '../components/Header.js';
@@ -18,7 +17,7 @@ const ProductInfo = () => {
   const book = data.find(item => item.id === Number(id));
 
   const addToCart = (id) => {
-    const newCart = addToCartStorage(id);
+    addToCartStorage(id);
     setData(prev => prev.map(item =>
       item.id === id
         ? { ...item, addedToCart: true, addedAmount: item.addedAmount + 1 }
@@ -27,7 +26,7 @@ const ProductInfo = () => {
   };
 
   const removeFromCart = (id) => {
-    const newCart = removeFromCartStorage(id);
+    removeFromCartStorage(id);
     setData(prev => prev.map(item =>
       item.id === id
         ? { ...item, addedAmount: Math.max(item.addedAmount - 1, 0), addedToCart: item.addedAmount - 1 > 0 }

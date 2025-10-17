@@ -1,4 +1,4 @@
-import { getCurrentUser } from "../utils/userUtils";
+import { getCurrentUser } from "../utils/userUtils.js";
 
 const ReviewList = ({ reviews, deletingId, onDelete }) => {
   return (

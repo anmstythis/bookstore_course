@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import api from '../axiosSetup';
-import { getCurrentUserId } from './userUtils';
+import api from '../axiosSetup.js';
+import { getCurrentUserId } from './userUtils.js';
 
 export const useReviews = (bookId) => {
   const [reviews, setReviews] = useState([]);
