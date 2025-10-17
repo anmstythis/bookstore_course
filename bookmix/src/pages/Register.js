@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
 import Header from '../components/Header.js';
 import Form from '../components/Form.js';
+import api from '../axiosSetup.js';
 
 const Register = () => {
   const navigate = useNavigate();
@@ -26,7 +26,7 @@ const Register = () => {
   useEffect(() => {
     const fetchRoles = async () => {
       try {
-        const res = await axios.get('http://localhost:5000/api/roles'); 
+        const res = await api.get('/roles'); 
         setRoles(res.data);
       } catch (err) {
         console.error('Ошибка при загрузке ролей:', err);
@@ -48,7 +48,7 @@ const Register = () => {
       }
 
       // создаём пользователя и аккаунт
-      await axios.post('http://localhost:5000/api/auth/register', {
+      await api.post('/auth/register', {
         login,
         password,
         role_id,
@@ -59,7 +59,7 @@ const Register = () => {
       });
 
       // авторизация
-      const { data } = await axios.post('http://localhost:5000/api/auth/login', {
+      const { data } = await api.post('/auth/login', {
         login,
         password
       });

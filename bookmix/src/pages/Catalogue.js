@@ -1,9 +1,9 @@
 import React, {useEffect, useState} from 'react';
-import axios from 'axios';
 import Header from '../components/Header.js';
 import Footer from '../components/Footer.js';
 import Card from '../components/CardMain.js';
 import { motion } from "framer-motion"
+import api from '../axiosSetup.js';
 
 
 const Catalogue = () => {
@@ -12,7 +12,7 @@ const Catalogue = () => {
     const [categories, setCategories] = useState([]);
 
     useEffect(() => {
-        axios.get('http://localhost:5000/api/categories')
+        api.get('/categories')
             .then(res => setCategories(res.data || []))
             .catch(err => console.log(err));
     }, []);

@@ -1,20 +1,12 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
 import Header from '../components/Header.js';
 import Form from '../components/Form.js';
+import { getCurrentUser } from '../utils/userUtils.js';
+import api from '../axiosSetup.js';
 
 const ResetPassword = () => {
   const navigate = useNavigate();
-
-  const storedUser = useMemo(() => {
-    try {
-      const userString = localStorage.getItem('user');
-      return userString ? JSON.parse(userString) : null;
-    } catch (e) {
-      return null;
-    }
-  }, []);
 
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
@@ -38,11 +30,11 @@ const ResetPassword = () => {
     try {
         if (storedUser)
         {
-            await axios.patch(`http://localhost:5000/api/accounts/${storedUser.id_account}`, {password, });
+            await api.patch(`/accounts/${getCurrentUser().id_account}`, {password, });
         }
         else
         {
-            await axios.patch(`http://localhost:5000/api/auth/reset`, {login, password});
+            await api.patch(`/auth/reset`, {login, password});
         }
 
         setSuccess('Пароль успешно обновлён!');
@@ -62,7 +54,7 @@ const ResetPassword = () => {
 
   return (
     <div>
-      <Header title={'Сброс пароля'} description={storedUser ? 'Введите новый пароль дважды' : 'Введите логин и новый пароль дважды'} />
+      <Header title={'Сброс пароля'} description={getCurrentUser() ? 'Введите новый пароль дважды' : 'Введите логин и новый пароль дважды'} />
       <div className="formContainer">
         <Form
           onSubmit={handleSubmit}

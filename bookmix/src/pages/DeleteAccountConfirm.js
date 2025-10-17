@@ -1,27 +1,19 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Header from '../components/Header.js';
 import Form from '../components/Form.js'
-import axios from 'axios';
+import { getCurrentUser } from '../utils/userUtils.js';
+import api from '../axiosSetup.js';
 
 const DeleteAccountConfirm = () =>
 {
   const navigate = useNavigate();
 
-  const storedUser = useMemo(() => {
-    try {
-      const userString = localStorage.getItem('user');
-      return userString ? JSON.parse(userString) : null;
-    } catch (e) {
-      return null;
-    }
-  }, []);
-
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  if (!storedUser)
+  if (!getCurrentUser())
   {
     return (
       <div>
@@ -45,13 +37,13 @@ const DeleteAccountConfirm = () =>
 
     try {
       setIsSubmitting(true);
-      await axios.post('http://localhost:5000/api/auth/login', {
-        login: storedUser.login,
+      await api.post('/auth/login', {
+        login: getCurrentUser().login,
         password: password,
       });
 
-      await axios.delete(`http://localhost:5000/api/users/${storedUser.id_user}`);
-      await axios.delete(`http://localhost:5000/api/accounts/${storedUser.id_account}`);
+      await api.delete(`/users/${getCurrentUser().id_user}`);
+      await api.delete(`/accounts/${getCurrentUser().id_account}`);
 
       localStorage.removeItem('user');
       navigate('/login', { replace: true });

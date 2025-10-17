@@ -1,12 +1,10 @@
-import React from 'react';
+import { getCurrentUser } from "../utils/userUtils";
 
 const ReviewList = ({ reviews, deletingId, onDelete }) => {
-  const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
-
   return (
     <ul className='reviewsList'>
       {reviews.map((rev) => {
-        const isMyReview = storedUser?.id_user === rev.user_id;
+        const isMyReview = getCurrentUser()?.id_user === rev.user_id;
         return (
           <li key={rev.id_review} className='reviewItem'>
             <div className='reviewHeader'>

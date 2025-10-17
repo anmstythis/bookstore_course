@@ -2,8 +2,8 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Header from '../components/Header.js';
 import Footer from '../components/Footer.js';
-import axios from 'axios';
 import { getCurrentUser } from '../utils/userUtils.js';
+import api from '../axiosSetup.js';
 
 const Orders = () => {
   const navigate = useNavigate();
@@ -18,7 +18,7 @@ const Orders = () => {
       if (!user) return;
 
       try {
-        const res = await axios.get(`http://localhost:5000/api/orders/user/${user.id_user}`);
+        const res = await api.get(`/orders/user/${user.id_user}`);
         setOrders(res.data || []);
       } catch (err) {
         console.error('Ошибка при получении заказов:', err);

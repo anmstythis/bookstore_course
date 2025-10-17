@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../axiosSetup';
+import { getCurrentUserId } from './userUtils';
 
 export const useReviews = (bookId) => {
   const [reviews, setReviews] = useState([]);
@@ -10,7 +11,7 @@ export const useReviews = (bookId) => {
   const fetchReviews = async () => {
     if (!bookId) return;
     try {
-      const { data } = await axios.get(`http://localhost:5000/api/reviews/book/${bookId}`);
+      const { data } = await api.get(`/reviews/book/${bookId}`);
       setReviews(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Ошибка при загрузке отзывов:', err);
@@ -23,16 +24,15 @@ export const useReviews = (bookId) => {
   }, [bookId]);
 
   const submitReview = async (rating, comment) => {
-    const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
-    if (!storedUser.id_user) {
+    if (!getCurrentUserId()) {
       setError('Для отправки отзыва необходимо войти');
       return;
     }
 
     try {
       setIsSubmitting(true);
-      await axios.post('http://localhost:5000/api/reviews', {
-        user_id: storedUser.id_user,
+      await api.post('/reviews', {
+        user_id: getCurrentUserId(),
         book_id: bookId,
         rating,
         usercomment: comment
@@ -46,8 +46,7 @@ export const useReviews = (bookId) => {
   };
 
   const deleteReview = async (id) => {
-    const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
-    if (!storedUser.id_user) {
+    if (!getCurrentUserId()) {
       setError('Необходимо войти, чтобы удалять отзывы');
       return;
     }
@@ -55,7 +54,7 @@ export const useReviews = (bookId) => {
 
     try {
       setDeletingId(id);
-      await axios.delete(`http://localhost:5000/api/reviews/${id}`);
+      await api.delete(`/reviews/${id}`);
       await fetchReviews();
     } catch {
       setError('Не удалось удалить отзыв');

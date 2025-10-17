@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import axios from 'axios';
 import Footer from '../components/Footer.js';
 import Header from '../components/Header.js';
 import ReviewList from '../components/ReviewList.js';

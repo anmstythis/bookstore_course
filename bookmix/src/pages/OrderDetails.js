@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Header from '../components/Header.js';
 import Footer from '../components/Footer.js';
-import axios from 'axios';
+import api from '../axiosSetup.js';
 
 const OrderDetails = () => {
   const { id } = useParams();
@@ -12,7 +12,7 @@ const OrderDetails = () => {
   useEffect(() => {
     const fetchOrderDetails = async () => {
       try {
-        const res = await axios.get(`http://localhost:5000/api/orders/${id}`);
+        const res = await api.get(`/orders/${id}`);
         const data = res.data;
 
         console.log(data);
