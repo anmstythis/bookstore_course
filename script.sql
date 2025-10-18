@@ -247,12 +247,30 @@ FROM Users u
 JOIN Accounts a ON u.Account_ID = a.ID_Account
 JOIN Roles r ON a.Role_ID = r.ID_Role;
 
+--топ пользователей
+CREATE OR REPLACE VIEW TopUsersView AS
+SELECT 
+    u.id_user,
+    (u.lastname || ' ' || u.firstname || ' ' || COALESCE(u.patronymic, '')) AS username,
+    COUNT(o.id_order) AS total_orders,
+    SUM(od.quantity * b.price) AS total_spent
+FROM users u
+JOIN orders o ON u.id_user = o.user_id
+JOIN orderdetails od ON o.id_order = od.order_id
+JOIN books b ON od.book_id = b.id_book
+GROUP BY u.id_user, u.lastname, u.firstname, u.patronymic
+ORDER BY total_spent DESC
+LIMIT 10;
+
+
 --ПРОВЕРКА ПРЕДСТАВЛЕНИЙ
 SELECT *FROM OrdersView
 SELECT *FROM BooksView
 SELECT *FROM TopBooksView
 SELECT *FROM OrderDetailsView
 SELECT *FROM UsersAccountsView
+SELECT *FROM TopUsersView
+
 
 --ФУНКЦИИ
 --топ книг за определенный период
@@ -410,6 +428,30 @@ CREATE TRIGGER trg_check_email
 BEFORE INSERT OR UPDATE ON Users
 FOR EACH ROW
 EXECUTE FUNCTION check_email_trigger();
+
+--автоматическое пополнение книг после отмены заказа
+CREATE OR REPLACE FUNCTION restore_books_on_cancel()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.Status_ID <> OLD.Status_ID AND NEW.Status_ID = 3 THEN
+    
+    UPDATE Books b
+    SET Quantity = b.Quantity + od.Quantity
+    FROM OrderDetails od
+    WHERE od.Book_ID = b.ID_Book
+      AND od.Order_ID = NEW.ID_Order;
+
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_restore_books_on_cancel
+AFTER UPDATE ON Orders
+FOR EACH ROW
+EXECUTE FUNCTION restore_books_on_cancel();
+
 
 --ПРОВЕРКА ТРИГГЕРОВ
 UPDATE Users

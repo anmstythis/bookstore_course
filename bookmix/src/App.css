@@ -4,6 +4,7 @@ body
   background-repeat: no-repeat;
   background-size: cover;
   background-attachment: fixed;
+  font-family: Georgia, 'Times New Roman', Times, serif;
 }
 
 html 
@@ -922,3 +923,41 @@ u
     min-width: 140px;
   }
 }
+
+
+/* ---ДЛЯ ГРАФИКОВ */
+.reports-container {
+  padding: 1.5rem;
+}
+
+.chart-card {
+  background-color: #887756;
+  padding: 1rem;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.chart-title {
+  font-size: 20pt;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  text-align: center;
+  color: #0d0c08;
+}
+
+.chart-wrapper {
+  width: 100%;
+  max-width: 500px; 
+  height: 400px; 
+  margin: 0 auto;
+  position: relative;
+}
+
+.chart-wrapper-small {
+  width: 300px;
+  height: 300px;
+}
+

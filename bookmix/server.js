@@ -18,6 +18,7 @@ import authorsRouter from './routes/authors.js';
 import categoriesRouter from './routes/categories.js';
 import publishersRouter from './routes/publishers.js';
 import authRoutes from './routes/auth.js';
+import reportsViews from './routes/reports.js'
 
 
 const app = express();
@@ -52,6 +53,7 @@ app.use('/api/authors', authorsRouter);
 app.use('/api/categories', categoriesRouter);
 app.use('/api/publishers', publishersRouter);
 app.use('/api/auth', authRoutes);
+app.use('/api/reports', reportsViews);
 
 // запуск сервера
 const PORT = process.env.PORT || 5000;

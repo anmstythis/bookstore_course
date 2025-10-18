@@ -13,6 +13,7 @@ import PasswordReset from './pages/PasswordReset.js';
 import DeleteAccountConfirm from './pages/DeleteAccountConfirm.js';
 import Orders from './pages/Orders.js';
 import OrderDetails from './pages/OrderDetails.js';
+import Reports from './pages/Reports.js'
 
 
 class App extends React.Component
@@ -34,6 +35,7 @@ class App extends React.Component
           <Route path="/reset-password" element={<PasswordReset/>}/>
           <Route path="/orders" element={<Orders/>}/>
           <Route path="/orders/:id" element={<OrderDetails/>}/>
+          <Route path="/reports" element={<Reports/>}/>
         </Routes>
       </div>
     )

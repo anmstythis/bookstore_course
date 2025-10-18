@@ -36,9 +36,9 @@ const Header = ({title, description}) =>
         navigate('/account');
     };
 
-    const handleNavigateSettings = () => {
+    const handleNavigateReports = () => {
         setIsMenuOpen(false);
-        navigate('/settings');
+        navigate('/reports');
     };
 
     const handleNavigateOrders = () => {
@@ -77,8 +77,8 @@ const Header = ({title, description}) =>
                     {isMenuOpen && (
                         <div className="menuDropdown" role="menu">
                             <button className="menuItem" onClick={handleNavigateAccount} role="menuitem">Учетная запись</button>
-                            <button className="menuItem" onClick={user.role_id === 1 ? handleNavigateSettings : handleNavigateOrders} 
-                                role="menuitem">{user.role_id === 1 ? 'Настройки' : 'Заказы'}</button>
+                            <button className="menuItem" onClick={user.role_id === 1 ? handleNavigateReports : handleNavigateOrders} 
+                                role="menuitem">{user.role_id === 1 ? 'Отчёты' : 'Заказы'}</button>
                             <button className="menuItem menuItemDanger" onClick={handleLogout} role="menuitem">Выйти</button>
                         </div>
                     )}
