@@ -41,6 +41,11 @@ const Header = ({title, description}) =>
         navigate('/reports');
     };
 
+     const handleNavigateProducts = () => {
+        setIsMenuOpen(false);
+        navigate('/products');
+    };
+
     const handleNavigateOrders = () => {
         setIsMenuOpen(false);
         navigate('/orders');
@@ -79,6 +84,7 @@ const Header = ({title, description}) =>
                             <button className="menuItem" onClick={handleNavigateAccount} role="menuitem">Учетная запись</button>
                             <button className="menuItem" onClick={user.role_id === 1 ? handleNavigateReports : handleNavigateOrders} 
                                 role="menuitem">{user.role_id === 1 ? 'Отчёты' : 'Заказы'}</button>
+                            {user.role_id === 1 && (<button className="menuItem" onClick={handleNavigateProducts} role="menuitem">Управление товарами</button>)}
                             <button className="menuItem menuItemDanger" onClick={handleLogout} role="menuitem">Выйти</button>
                         </div>
                     )}

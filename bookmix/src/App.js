@@ -14,6 +14,11 @@ import DeleteAccountConfirm from './pages/DeleteAccountConfirm.js';
 import Orders from './pages/Orders.js';
 import OrderDetails from './pages/OrderDetails.js';
 import Reports from './pages/Reports.js'
+import Products from './pages/Products.js'
+import AddProduct from './pages/AddProduct.js';
+import AddAuthor from './pages/AddAuthor.js';
+import AddPublisher from './pages/AddPublisher.js';
+import AddCategory from './pages/AddCategory.js';
 
 
 class App extends React.Component
@@ -36,6 +41,11 @@ class App extends React.Component
           <Route path="/orders" element={<Orders/>}/>
           <Route path="/orders/:id" element={<OrderDetails/>}/>
           <Route path="/reports" element={<Reports/>}/>
+          <Route path="/products" element={<Products/>}/>
+          <Route path="products/add-book" element={<AddProduct/>}/>
+          <Route path="products/add-author" element={<AddAuthor/>}/>
+          <Route path="products/add-publisher" element={<AddPublisher/>}/>
+          <Route path="products/add-category" element={<AddCategory/>}/>
         </Routes>
       </div>
     )

@@ -98,7 +98,7 @@ u
   font-size: 16pt;
 }
 
-.foot2
+.foot2, .foot3
 {
   color: #ffffff;
   text-shadow: #1D1C1A 8px 9px 10px;
@@ -109,6 +109,10 @@ u
   margin-left: 40px;
   margin-right: 20px;
   font-size: 20pt;
+}
+
+.foot3 {
+  text-align: center;
 }
 
 .divFoot
@@ -959,5 +963,42 @@ u
 .chart-wrapper-small {
   width: 300px;
   height: 300px;
+}
+
+/* ---ИЗОБРАЖЕНИЕ ТОВАРА--- */
+.bookImage, .noImage {
+  width: 60px;
+  height: 80px;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.bookImage {
+    object-fit: cover;
+}
+
+.bookImage:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.3);
+}
+
+.noImage {
+  background-color: #f3f3f3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #999;
+  font-size: 12px;
+  font-style: italic;
+}
+
+.addressInputs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.smallInput {
+  width: 90px;
 }
 
