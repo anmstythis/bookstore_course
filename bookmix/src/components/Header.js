@@ -53,7 +53,7 @@ const Header = ({title, description}) =>
 
     const handleNavigateOrdersManage = () => {
         setIsMenuOpen(false);
-        navigate('/orders-manager');
+        navigate('/orders-manage');
     }
 
     const handleNavigateAudit = () => {

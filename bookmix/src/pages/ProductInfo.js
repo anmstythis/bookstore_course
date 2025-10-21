@@ -1,3 +1,4 @@
+import { useCallback, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import Footer from '../components/Footer.js';
 import Header from '../components/Header.js';
@@ -7,7 +8,7 @@ import { motion } from "framer-motion";
 import { addToCartStorage, removeFromCartStorage } from '../utils/cartUtils.js';
 import { toggleFavoriteStorage } from '../utils/favoriteUtils.js';
 import { useBooksData } from '../utils/booksUtils.js';
-import { useReviews,  } from '../utils/reviewsUtils.js';
+import { useReviews } from '../utils/reviewsUtils.js';
 
 const ProductInfo = () => {
   const { id } = useParams(); 
@@ -16,23 +17,23 @@ const ProductInfo = () => {
 
   const book = data.find(item => item.id === Number(id));
 
-  const addToCart = (id) => {
+  const addToCart = useCallback((id) => {
     addToCartStorage(id);
     setData(prev => prev.map(item =>
       item.id === id
         ? { ...item, addedToCart: true, addedAmount: item.addedAmount + 1 }
         : item
     ));
-  };
+  }, [setData]);
 
-  const removeFromCart = (id) => {
+  const removeFromCart = useCallback((id) => {
     removeFromCartStorage(id);
     setData(prev => prev.map(item =>
       item.id === id
         ? { ...item, addedAmount: Math.max(item.addedAmount - 1, 0), addedToCart: item.addedAmount - 1 > 0 }
         : item
     ));
-  };
+  }, [setData]);
 
   const becomeFavorite = (id) => {
     const result = toggleFavoriteStorage(id);
@@ -47,6 +48,23 @@ const ProductInfo = () => {
       )
     );
   };
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      // Alt + ↑ → добавить в корзину
+      if (event.altKey && event.key === "ArrowUp") {
+        addToCart(Number(id));
+      }
+
+      // Alt + ↓ → убрать из корзины
+      if (event.altKey && event.key === "ArrowDown") {
+        removeFromCart(Number(id));
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [id, data, addToCart, removeFromCart]);
 
   if (error) return <div className='welcome'>Ошибка: {error}</div>;
   if (!book) return <div className='welcome'>Загрузка...</div>;
@@ -85,7 +103,7 @@ const ProductInfo = () => {
 
       <div className='reviewsSection'>
         <h3 className='welcome'>Отзывы</h3>
-          {reviews.length === 0 ? (
+        {reviews.length === 0 ? (
           <p className='head'>Пока нет отзывов.</p>
         ) : (
           <ReviewList reviews={reviews} deletingId={deletingId} onDelete={deleteReview}/>

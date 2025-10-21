@@ -12,10 +12,25 @@ const ReviewForm = ({ onSubmit, loading, error }) => {
     setRating(5);
   };
 
+  const handleKeyDown = (e) => {
+    if (e.ctrlKey && e.key === 'Enter') {
+      e.preventDefault();
+      if (!loading && comment.trim()) {
+        handleSubmit(e);
+      }
+    }
+  };
+
   return (
-    <Form onSubmit={handleSubmit} loading={loading} error={error} submitLabel="Отправить отзыв" loadingLabel="Отправка...">
+    <Form
+      onSubmit={handleSubmit}
+      loading={loading}
+      error={error}
+      submitLabel="Отправить отзыв"
+      loadingLabel="Отправка..."
+    >
       <div className='formLabel' role='radiogroup' aria-label='Оценка'>
-        {[1,2,3,4,5].map((value) => (
+        {[1, 2, 3, 4, 5].map((value) => (
           <button
             key={value}
             type='button'
@@ -27,10 +42,12 @@ const ReviewForm = ({ onSubmit, loading, error }) => {
           </button>
         ))}
       </div>
+
       <textarea
         className='formInput'
         value={comment}
         onChange={(e) => setComment(e.target.value)}
+        onKeyDown={handleKeyDown}
         placeholder='Поделитесь впечатлением о книге'
         rows={4}
         disabled={loading}
