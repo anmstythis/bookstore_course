@@ -31,6 +31,36 @@ COMMENT ON EXTENSION pgcrypto IS 'cryptographic functions';
 
 
 --
+-- Name: addbook(character varying, text, date, integer, integer, integer, numeric, integer, text); Type: PROCEDURE; Schema: public; Owner: postgres
+--
+
+CREATE PROCEDURE public.addbook(IN p_title character varying, IN p_description text, IN p_publishdate date, IN p_author_id integer, IN p_publisher_id integer, IN p_category_id integer, IN p_price numeric, IN p_quantity integer, IN p_imageurl text)
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM Authors WHERE ID_Author = p_author_id) THEN
+        RAISE EXCEPTION 'Автор с ID % не найден.', p_author_id;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM Publishers WHERE ID_Publisher = p_publisher_id) THEN
+        RAISE EXCEPTION 'Издатель с ID % не найден.', p_publisher_id;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM Categories WHERE ID_Category = p_category_id) THEN
+        RAISE EXCEPTION 'Категория с ID % не найдена.', p_category_id;
+    END IF;
+
+    INSERT INTO Books (Title, Description, PublishDate, Author_ID, Publisher_ID, Category_ID, Price, Quantity, ImageURL)
+    VALUES (p_title, p_description, p_publishdate, p_author_id, p_publisher_id, p_category_id, p_price, p_quantity, p_imageurl);
+
+    RAISE NOTICE 'Книга "% успешно добавлена."', p_title;
+END;
+$$;
+
+
+ALTER PROCEDURE public.addbook(IN p_title character varying, IN p_description text, IN p_publishdate date, IN p_author_id integer, IN p_publisher_id integer, IN p_category_id integer, IN p_price numeric, IN p_quantity integer, IN p_imageurl text) OWNER TO postgres;
+
+--
 -- Name: check_email_trigger(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -65,6 +95,24 @@ $_$;
 
 
 ALTER FUNCTION public.check_publisher_phone() OWNER TO postgres;
+
+--
+-- Name: deleteorder(integer); Type: PROCEDURE; Schema: public; Owner: postgres
+--
+
+CREATE PROCEDURE public.deleteorder(IN p_order_id integer)
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    DELETE FROM OrderDetails WHERE Order_ID = p_order_id;
+    DELETE FROM Orders WHERE ID_Order = p_order_id;
+
+    RAISE NOTICE 'Заказ % и его детали удалены.', p_order_id;
+END;
+$$;
+
+
+ALTER PROCEDURE public.deleteorder(IN p_order_id integer) OWNER TO postgres;
 
 --
 -- Name: get_income_period(integer); Type: FUNCTION; Schema: public; Owner: postgres
@@ -235,6 +283,30 @@ $$;
 
 
 ALTER FUNCTION public.reduce_book_quantity() OWNER TO postgres;
+
+--
+-- Name: registeruser(character varying, character varying, integer, character varying, character varying, character varying, character varying); Type: PROCEDURE; Schema: public; Owner: postgres
+--
+
+CREATE PROCEDURE public.registeruser(IN p_login character varying, IN p_hashpassword character varying, IN p_role_id integer, IN p_lastname character varying, IN p_firstname character varying, IN p_patronymic character varying, IN p_email character varying)
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_account_id INT;
+BEGIN
+    INSERT INTO Accounts (Login, HashPassword, Role_ID)
+    VALUES (p_login, p_hashpassword, p_role_id)
+    RETURNING ID_Account INTO v_account_id;
+
+    INSERT INTO Users (Lastname, Firstname, Patronymic, Email, Account_ID)
+    VALUES (p_lastname, p_firstname, p_patronymic, p_email, v_account_id);
+
+    RAISE NOTICE 'Пользователь % успешно зарегистрирован.', p_login;
+END;
+$$;
+
+
+ALTER PROCEDURE public.registeruser(IN p_login character varying, IN p_hashpassword character varying, IN p_role_id integer, IN p_lastname character varying, IN p_firstname character varying, IN p_patronymic character varying, IN p_email character varying) OWNER TO postgres;
 
 --
 -- Name: restore_books_on_cancel(); Type: FUNCTION; Schema: public; Owner: postgres
@@ -1108,6 +1180,8 @@ COPY public.auditlog (id_audit, tablename, record_id, action, changedby, changed
 106	books	1	UPDATE	aln	2025-10-20 21:46:32.824745	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
 107	books	1	UPDATE	aln	2025-10-20 21:47:28.987148	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
 108	books	1	UPDATE	aln	2025-10-20 21:49:33.925807	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 2, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+141	reviews	12	INSERT	aln	2025-10-21 14:23:47.795356	\N	{"rating": 5, "book_id": 5, "user_id": 4, "id_review": 12, "reviewdate": "2025-10-21T14:23:47.795356", "usercomment": "я родион"}
+142	reviews	12	DELETE	aln	2025-10-21 14:23:55.52093	{"rating": 5, "book_id": 5, "user_id": 4, "id_review": 12, "reviewdate": "2025-10-21T14:23:47.795356", "usercomment": "я родион"}	\N
 109	books	1	UPDATE	aln	2025-10-20 21:49:56.292354	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 2, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
 110	books	1	UPDATE	aln	2025-10-20 21:52:18.324964	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 2, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
 111	books	1	UPDATE	aln	2025-10-20 21:52:28.794758	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 2, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
@@ -1290,7 +1364,7 @@ SELECT pg_catalog.setval('public.addresses_id_address_seq', 9, true);
 -- Name: auditlog_id_audit_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.auditlog_id_audit_seq', 140, true);
+SELECT pg_catalog.setval('public.auditlog_id_audit_seq', 142, true);
 
 
 --
@@ -1346,7 +1420,7 @@ SELECT pg_catalog.setval('public.publishers_id_publisher_seq', 4, true);
 -- Name: reviews_id_review_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.reviews_id_review_seq', 11, true);
+SELECT pg_catalog.setval('public.reviews_id_review_seq', 12, true);
 
 
 --

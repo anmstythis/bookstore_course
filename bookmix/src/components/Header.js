@@ -61,6 +61,11 @@ const Header = ({title, description}) =>
         navigate('/audit');
     }
 
+    const handleNavigateBackup = () => {
+        setIsMenuOpen(false);
+        navigate('/backup-db');
+    }
+
     const handleLogout = () => {
         setIsMenuOpen(false);
         try {
@@ -96,6 +101,7 @@ const Header = ({title, description}) =>
                             {user.role_id === 1 && (<button className="menuItem" onClick={handleNavigateProducts} role="menuitem">Управление товарами</button>)}
                             {user.role_id === 1 && (<button className="menuItem" onClick={handleNavigateOrdersManage} role="menuitem">Управление заказами</button>)}
                             {user.role_id === 1 && (<button className="menuItem" onClick={handleNavigateAudit} role="menuitem">Журнал аудита</button>)}
+                            {user.role_id === 1 && (<button className="menuItem" onClick={handleNavigateBackup} role="menuitem">Создание резервной копии</button>)}
                             <button className="menuItem menuItemDanger" onClick={handleLogout} role="menuitem">Выйти</button>
                         </div>
                     )}

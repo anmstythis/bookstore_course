@@ -271,6 +271,79 @@ SELECT *FROM OrderDetailsView
 SELECT *FROM UsersAccountsView
 SELECT *FROM TopUsersView
 
+--ПРОЦЕДУРЫ
+--добавление книги
+CREATE OR REPLACE PROCEDURE AddBook(
+    p_title VARCHAR,
+    p_description TEXT,
+    p_publishdate DATE,
+    p_author_id INT,
+    p_publisher_id INT,
+    p_category_id INT,
+    p_price DECIMAL,
+    p_quantity INT,
+    p_imageurl TEXT
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM Authors WHERE ID_Author = p_author_id) THEN
+        RAISE EXCEPTION 'Автор с ID % не найден.', p_author_id;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM Publishers WHERE ID_Publisher = p_publisher_id) THEN
+        RAISE EXCEPTION 'Издатель с ID % не найден.', p_publisher_id;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM Categories WHERE ID_Category = p_category_id) THEN
+        RAISE EXCEPTION 'Категория с ID % не найдена.', p_category_id;
+    END IF;
+
+    INSERT INTO Books (Title, Description, PublishDate, Author_ID, Publisher_ID, Category_ID, Price, Quantity, ImageURL)
+    VALUES (p_title, p_description, p_publishdate, p_author_id, p_publisher_id, p_category_id, p_price, p_quantity, p_imageurl);
+
+    RAISE NOTICE 'Книга "% успешно добавлена."', p_title;
+END;
+$$;
+
+--регистрация нового пользователя
+CREATE OR REPLACE PROCEDURE RegisterUser(
+    p_login VARCHAR,
+    p_hashpassword VARCHAR,
+    p_role_id INT,
+    p_lastname VARCHAR,
+    p_firstname VARCHAR,
+    p_patronymic VARCHAR,
+    p_email VARCHAR
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_account_id INT;
+BEGIN
+    INSERT INTO Accounts (Login, HashPassword, Role_ID)
+    VALUES (p_login, p_hashpassword, p_role_id)
+    RETURNING ID_Account INTO v_account_id;
+
+    INSERT INTO Users (Lastname, Firstname, Patronymic, Email, Account_ID)
+    VALUES (p_lastname, p_firstname, p_patronymic, p_email, v_account_id);
+
+    RAISE NOTICE 'Пользователь % успешно зарегистрирован.', p_login;
+END;
+$$;
+
+--удаление заказа полностью
+CREATE OR REPLACE PROCEDURE DeleteOrder(p_order_id INT)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    DELETE FROM OrderDetails WHERE Order_ID = p_order_id;
+    DELETE FROM Orders WHERE ID_Order = p_order_id;
+
+    RAISE NOTICE 'Заказ % и его детали удалены.', p_order_id;
+END;
+$$;
+
 
 --ФУНКЦИИ
 --топ книг за определенный период
@@ -351,7 +424,6 @@ BEGIN
     LIMIT p_limit;
 END;
 $$ LANGUAGE plpgsql;
-
 
 --ПРОВЕРКА ФУНКЦИЙ
 SELECT * FROM get_top_books_period(30, 5);  -- топ-5 книг за 30 дней

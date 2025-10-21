@@ -21,6 +21,8 @@ import authRoutes from './routes/auth.js';
 import reportsViews from './routes/reports.js';
 import auditRouter from './routes/auditLog.js';
 
+import backup from './backup/backup.js'
+
 
 const app = express();
 app.use(express.json());
@@ -56,6 +58,8 @@ app.use('/api/publishers', publishersRouter);
 app.use('/api/auth', authRoutes);
 app.use('/api/reports', reportsViews);
 app.use('/api/audit', auditRouter);
+
+app.use('/api/backup', backup);
 
 // запуск сервера
 const PORT = process.env.PORT || 5000;

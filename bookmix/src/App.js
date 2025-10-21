@@ -21,6 +21,7 @@ import AddPublisher from './pages/AddPublisher.js';
 import AddCategory from './pages/AddCategory.js';
 import OrderManager from './pages/OrderManager.js';
 import AuditLogManager from './pages/AuditLogManager.js';
+import BackupRestore from './pages/BackupRestore.js';
 
 
 class App extends React.Component
@@ -50,6 +51,7 @@ class App extends React.Component
           <Route path="products/add-category" element={<AddCategory/>}/>
           <Route path="/orders-manage" element={<OrderManager/>}/>
           <Route path="/audit" element={<AuditLogManager/>}/>
+          <Route path="backup-db" element={<BackupRestore/>}/>
         </Routes>
       </div>
     )
