@@ -1305,6 +1305,166 @@ export default {
 					} 
 				} 
 			} 
+		},
+		'/api/audit': {
+			get: {
+				summary: 'Получить все записи журнала аудита',
+				tags: ['Аудит'],
+				parameters: [
+					{
+						name: 'table',
+						in: 'query',
+						required: false,
+						schema: { type: 'string' },
+						description: 'Название таблицы, по которой фильтруются записи'
+					},
+					{
+						name: 'action',
+						in: 'query',
+						required: false,
+						schema: { type: 'string', enum: ['INSERT', 'UPDATE', 'DELETE'] },
+						description: 'Тип действия, по которому фильтруются записи'
+					},
+					{
+						name: 'user',
+						in: 'query',
+						required: false,
+						schema: { type: 'string' },
+						description: 'Пользователь, совершивший изменение'
+					}
+				],
+				responses: {
+					200: {
+						description: 'Список записей аудита',
+						content: {
+							'application/json': {
+								schema: {
+									type: 'array',
+									items: {
+										type: 'object',
+										properties: {
+											ID_Audit: { type: 'integer', example: 1 },
+											TableName: { type: 'string', example: 'books' },
+											Record_ID: { type: 'integer', example: 12 },
+											Action: { type: 'string', example: 'UPDATE' },
+											ChangedBy: { type: 'string', example: 'admin' },
+											ChangedAt: { type: 'string', format: 'date-time', example: '2025-10-21T09:00:00Z' },
+											OldValue: { type: 'object', example: { title: 'Old Title' } },
+											NewValue: { type: 'object', example: { title: 'New Title' } }
+										}
+									}
+								}
+							}
+						}
+					},
+					500: {
+						description: 'Ошибка сервера'
+					}
+				}
+			},
+			post: {
+				summary: 'Добавить новую запись аудита вручную',
+				tags: ['Аудит'],
+				requestBody: {
+					required: true,
+					content: {
+						'application/json': {
+							schema: {
+								type: 'object',
+								properties: {
+									TableName: { type: 'string', example: 'books' },
+									Record_ID: { type: 'integer', example: 12 },
+									Action: { type: 'string', enum: ['INSERT', 'UPDATE', 'DELETE'] },
+									ChangedBy: { type: 'string', example: 'admin' },
+									OldValue: { type: 'object', example: { title: 'Old Title' } },
+									NewValue: { type: 'object', example: { title: 'New Title' } }
+								},
+								required: ['TableName', 'Action']
+							}
+						}
+					}
+				},
+				responses: {
+					201: {
+						description: 'Запись успешно добавлена'
+					},
+					400: {
+						description: 'Некорректные данные'
+					},
+					500: {
+						description: 'Ошибка сервера'
+					}
+				}
+			}
+		},
+
+		'/api/audit/{id}': {
+			get: {
+				summary: 'Получить запись аудита по ID',
+				tags: ['Аудит'],
+				parameters: [
+					{
+						name: 'id',
+						in: 'path',
+						required: true,
+						schema: { type: 'integer' },
+						description: 'ID записи аудита'
+					}
+				],
+				responses: {
+					200: {
+						description: 'Данные записи аудита',
+						content: {
+							'application/json': {
+								schema: {
+									type: 'object',
+									properties: {
+										ID_Audit: { type: 'integer', example: 1 },
+										TableName: { type: 'string', example: 'orders' },
+										Record_ID: { type: 'integer', example: 8 },
+										Action: { type: 'string', example: 'DELETE' },
+										ChangedBy: { type: 'string', example: 'manager01' },
+										ChangedAt: { type: 'string', format: 'date-time', example: '2025-10-21T09:34:56Z' },
+										OldValue: { type: 'object', example: { status: 'Ожидает' } },
+										NewValue: { type: 'object', example: { status: 'Отменён' } }
+									}
+								}
+							}
+						}
+					},
+					404: {
+						description: 'Запись не найдена'
+					},
+					500: {
+						description: 'Ошибка сервера'
+					}
+				}
+			},
+			delete: {
+				summary: 'Удалить запись из аудита (не рекомендуется)',
+				tags: ['Аудит'],
+				parameters: [
+					{
+						name: 'id',
+						in: 'path',
+						required: true,
+						schema: { type: 'integer' },
+						description: 'ID записи аудита'
+					}
+				],
+				responses: {
+					200: {
+						description: 'Запись успешно удалена'
+					},
+					404: {
+						description: 'Запись не найдена'
+					},
+					500: {
+						description: 'Ошибка сервера'
+					}
+				}
+			}
 		}
+
 	}
 };

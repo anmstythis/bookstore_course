@@ -19,6 +19,8 @@ import AddProduct from './pages/AddProduct.js';
 import AddAuthor from './pages/AddAuthor.js';
 import AddPublisher from './pages/AddPublisher.js';
 import AddCategory from './pages/AddCategory.js';
+import OrderManager from './pages/OrderManager.js';
+import AuditLogManager from './pages/AuditLogManager.js';
 
 
 class App extends React.Component
@@ -46,6 +48,8 @@ class App extends React.Component
           <Route path="products/add-author" element={<AddAuthor/>}/>
           <Route path="products/add-publisher" element={<AddPublisher/>}/>
           <Route path="products/add-category" element={<AddCategory/>}/>
+          <Route path="/orders-manage" element={<OrderManager/>}/>
+          <Route path="/audit" element={<AuditLogManager/>}/>
         </Routes>
       </div>
     )

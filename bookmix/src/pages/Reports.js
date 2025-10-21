@@ -232,7 +232,7 @@ const Reports = () => {
           </div>
         </div>
 
-        <div>
+        <div className="chart-card">
           <h3 className="chart-title">Количество книг по категориям</h3>
           <div className="chart-wrapper">
             <Bar

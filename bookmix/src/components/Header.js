@@ -51,10 +51,19 @@ const Header = ({title, description}) =>
         navigate('/orders');
     }
 
+    const handleNavigateOrdersManage = () => {
+        setIsMenuOpen(false);
+        navigate('/orders-manager');
+    }
+
+    const handleNavigateAudit = () => {
+        setIsMenuOpen(false);
+        navigate('/audit');
+    }
+
     const handleLogout = () => {
         setIsMenuOpen(false);
         try {
-            localStorage.removeItem('authToken');
             localStorage.removeItem('user');
         } catch (e) {
             
@@ -85,6 +94,8 @@ const Header = ({title, description}) =>
                             <button className="menuItem" onClick={user.role_id === 1 ? handleNavigateReports : handleNavigateOrders} 
                                 role="menuitem">{user.role_id === 1 ? 'Отчёты' : 'Заказы'}</button>
                             {user.role_id === 1 && (<button className="menuItem" onClick={handleNavigateProducts} role="menuitem">Управление товарами</button>)}
+                            {user.role_id === 1 && (<button className="menuItem" onClick={handleNavigateOrdersManage} role="menuitem">Управление заказами</button>)}
+                            {user.role_id === 1 && (<button className="menuItem" onClick={handleNavigateAudit} role="menuitem">Журнал аудита</button>)}
                             <button className="menuItem menuItemDanger" onClick={handleLogout} role="menuitem">Выйти</button>
                         </div>
                     )}
