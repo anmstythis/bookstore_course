@@ -1,0 +1,36 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres
+    container_name: bookmix_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 1
+      POSTGRES_DB: BookMixDB
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  backend:
+    build: ./backend
+    container_name: bookmix_backend
+    environment:
+      - DOCKER_ENV=true
+    ports:
+      - "5000:5000"
+    depends_on:
+      - db
+
+  frontend:
+    build: ./frontend
+    container_name: bookmix_frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  db_data:
