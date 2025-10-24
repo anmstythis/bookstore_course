@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import Header from "../components/Header.js";
 import Form from "../components/Form.js";
+import { getCurrentUser } from "../utils/userUtils.js";
 import api from "../axiosSetup.js";
 
 const BackupRestore = () => {
@@ -66,6 +67,27 @@ const BackupRestore = () => {
     }
     };
 
+
+  if (!getCurrentUser()) {
+    return (
+      <div>
+        <Header title="Бэкап и восстановление БД" description="Вы не вошли в систему" />
+        <div className="formContainer">
+          <div className="hint">
+            Пожалуйста, <Link className="redirectLink" to="/login">войдите</Link>.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  else if (getCurrentUser().role_id !== 1) {
+    return (
+      <div>
+        <Header title="Бэкап и восстановление БД" description="У Вас нет доступа." />
+      </div>
+    );
+  }
 
   return (
     <div>

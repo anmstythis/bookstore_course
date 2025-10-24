@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import api from "../axiosSetup.js";
 import Header from "../components/Header.js";
+import { Link } from 'react-router-dom';
+import { getCurrentUser } from "../utils/userUtils.js";
 import { Bar, Pie } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -114,6 +116,27 @@ const Reports = () => {
     URL.revokeObjectURL(url);
   };
 
+  if (!getCurrentUser()) {
+    return (
+      <div>
+        <Header title="Аналитика продаж" description="Вы не вошли в систему" />
+        <div className="formContainer">
+          <div className="hint">
+            Пожалуйста, <Link className="redirectLink" to="/login">войдите</Link> или{' '}
+            <Link className="redirectLink" to="/register">зарегистрируйтесь</Link>.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  else if (getCurrentUser().role_id !== 1) {
+    return (
+      <div>
+        <Header title="Аналитика продаж" description="У Вас нет доступа." />
+      </div>
+    );
+  }
 
   return (
     <div className="reports-container">

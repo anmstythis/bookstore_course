@@ -88,6 +88,14 @@ const Accounts = () => {
     );
   }
 
+  else if (getCurrentUser().role_id !== 1) {
+    return (
+      <div>
+        <Header title="Управление аккаунтами" description="У Вас нет доступа." />
+      </div>
+    );
+  }
+
   return (
     <div>
       <Header

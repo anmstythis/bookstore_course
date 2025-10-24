@@ -27,7 +27,7 @@ const Header = ({ title, description }) => {
 
   const toggleMenu = () => {
     setIsMenuOpen((prev) => !prev);
-    setIsAdminOpen(false); // закрываем подменю при сворачивании основного меню
+    setIsAdminOpen(false); 
   };
 
   const toggleAdminMenu = () => {

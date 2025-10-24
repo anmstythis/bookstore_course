@@ -70,6 +70,14 @@ const AuditLogManager = () => {
     );
   }
 
+  else if (getCurrentUser().role_id !== 1) {
+    return (
+      <div>
+        <Header title="Журнал аудита" description="У Вас нет доступа." />
+      </div>
+    );
+  }
+
   return (
     <div>
       <Header title="Журнал аудита" description="Просмотр изменений в базе данных" />

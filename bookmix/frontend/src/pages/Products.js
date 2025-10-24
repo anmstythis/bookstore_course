@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
+import { getCurrentUser } from "../utils/userUtils.js";
 import Header from "../components/Header.js";
 import Footer from "../components/Footer.js";
 import api from "../axiosSetup.js";
@@ -212,6 +213,28 @@ const Products = () => {
     return (
       <div>
         <Header title="Загрузка..." description="Пожалуйста, подождите" />
+      </div>
+    );
+  }
+
+  if (!getCurrentUser()) {
+    return (
+      <div>
+        <Header title="Управление товарами" description="Вы не вошли в систему" />
+        <div className="formContainer">
+          <div className="hint">
+            Пожалуйста, <Link className="redirectLink" to="/login">войдите</Link> или{' '}
+            <Link className="redirectLink" to="/register">зарегистрируйтесь</Link>.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  else if (getCurrentUser().role_id !== 1) {
+    return (
+      <div>
+        <Header title="Управление товарами" description="У Вас нет доступа." />
       </div>
     );
   }

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
+import { getCurrentUser } from "../utils/userUtils.js";
 import api from "../axiosSetup.js";
 import Header from "./Header.js";
 import Form from "./Form.js";
@@ -68,6 +69,28 @@ const AddEntity = ({ title, description, apiPath, fields, customSubmit }) => {
       setLoading(false);
     }
   };
+
+  if (!getCurrentUser()) {
+    return (
+      <div>
+        <Header title={title} description="Вы не вошли в систему" />
+        <div className="formContainer">
+          <div className="hint">
+            Пожалуйста, <Link className="redirectLink" to="/login">войдите</Link> или{' '}
+            <Link className="redirectLink" to="/register">зарегистрируйтесь</Link>.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  else if (getCurrentUser().role_id !== 1) {
+    return (
+      <div>
+        <Header title={title} description="У Вас нет доступа." />
+      </div>
+    );
+  }
 
 
   return (

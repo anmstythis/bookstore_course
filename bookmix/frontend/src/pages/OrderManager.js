@@ -86,6 +86,14 @@ const OrderManager = () => {
     );
   }
 
+  else if (getCurrentUser().role_id !== 1) {
+    return (
+      <div>
+        <Header title="Управление заказами" description="У Вас нет доступа." />
+      </div>
+    );
+  }
+
   return (
     <div>
       <Header title="Управление заказами" description="Просмотр и изменение заказов" />
