@@ -9,29 +9,20 @@ const BackupRestore = () => {
   const [backupFile, setBackupFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
   const [showSection, setShowSection] = useState("backup"); 
+  const [pgPassword, setPgPassword] = useState("");
 
   const handleBackup = async (e) => {
     e.preventDefault();
     setError("");
-    setSuccess("");
     setLoading(true);
 
     try {
-      const response = await api.get("/backup", {
-        responseType: "blob",
-      });
-
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "bookmix_backup.sql";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-
-      setSuccess("Бэкап успешно создан и загружен!");
+      const response = await api.post("backup", { password: pgPassword, download: false });
+      const fileName = response?.data?.file;
+      alert(fileName 
+        ? `Бэкап успешно создан: ${fileName}`
+        : "Бэкап успешно создан на сервере.");
     } catch (err) {
       console.error("Ошибка при создании бэкапа:", err);
       setError("Не удалось создать бэкап.");
@@ -48,16 +39,18 @@ const BackupRestore = () => {
     }
 
     setError("");
-    setSuccess("");
     setLoading(true);
 
     try {
         const formData = new FormData();
         formData.append("file", backupFile);
+      if (pgPassword) {
+        formData.append("password", pgPassword);
+      }
 
         await api.post("backup/restore", formData);
 
-        setSuccess("База данных успешно восстановлена из бэкапа!");
+        alert("База данных успешно восстановлена из бэкапа!");
         setBackupFile(null);
     } catch (error) {
         console.error("Ошибка при восстановлении:", error);
@@ -117,20 +110,23 @@ const BackupRestore = () => {
             onSubmit={handleBackup}
             loading={loading}
             error={error}
-            success={success}
             submitLabel="Создать бэкап"
             loadingLabel="Создание..."
           >
-            <p className="formHint">
-              Нажмите кнопку ниже, чтобы создать резервную копию базы данных.
-            </p>
+            <label className="formLabel">Пароль PostgreSQL</label>
+            <input
+              className="formInput"
+              type="password"
+              placeholder="Пароль пользователя postgres"
+              value={pgPassword}
+              onChange={(e) => setPgPassword(e.target.value)}
+            />
           </Form>
         ) : (
           <Form
             onSubmit={handleRestore}
             loading={loading}
             error={error}
-            success={success}
             submitLabel="Восстановить БД"
             loadingLabel="Восстановление..."
           >
@@ -141,6 +137,14 @@ const BackupRestore = () => {
               accept=".sql"
               onChange={(e) => setBackupFile(e.target.files[0])}
               required
+            />
+            <label className="formLabel">Пароль PostgreSQL</label>
+            <input
+              className="formInput"
+              type="password"
+              placeholder="Пароль пользователя postgres"
+              value={pgPassword}
+              onChange={(e) => setPgPassword(e.target.value)}
             />
           </Form>
         )}

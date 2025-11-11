@@ -1,0 +1,1868 @@
+--
+-- PostgreSQL database dump
+--
+
+-- Dumped from database version 16.2
+-- Dumped by pg_dump version 16.2
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- Name: pgcrypto; Type: EXTENSION; Schema: -; Owner: -
+--
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
+
+
+--
+-- Name: EXTENSION pgcrypto; Type: COMMENT; Schema: -; Owner: 
+--
+
+COMMENT ON EXTENSION pgcrypto IS 'cryptographic functions';
+
+
+--
+-- Name: addbook(character varying, text, date, integer, integer, integer, numeric, integer, text); Type: PROCEDURE; Schema: public; Owner: postgres
+--
+
+CREATE PROCEDURE public.addbook(IN p_title character varying, IN p_description text, IN p_publishdate date, IN p_author_id integer, IN p_publisher_id integer, IN p_category_id integer, IN p_price numeric, IN p_quantity integer, IN p_imageurl text)
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM Authors WHERE ID_Author = p_author_id) THEN
+        RAISE EXCEPTION 'Автор с ID % не найден.', p_author_id;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM Publishers WHERE ID_Publisher = p_publisher_id) THEN
+        RAISE EXCEPTION 'Издатель с ID % не найден.', p_publisher_id;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM Categories WHERE ID_Category = p_category_id) THEN
+        RAISE EXCEPTION 'Категория с ID % не найдена.', p_category_id;
+    END IF;
+
+    INSERT INTO Books (Title, Description, PublishDate, Author_ID, Publisher_ID, Category_ID, Price, Quantity, ImageURL)
+    VALUES (p_title, p_description, p_publishdate, p_author_id, p_publisher_id, p_category_id, p_price, p_quantity, p_imageurl);
+
+    RAISE NOTICE 'Книга "% успешно добавлена."', p_title;
+END;
+$$;
+
+
+ALTER PROCEDURE public.addbook(IN p_title character varying, IN p_description text, IN p_publishdate date, IN p_author_id integer, IN p_publisher_id integer, IN p_category_id integer, IN p_price numeric, IN p_quantity integer, IN p_imageurl text) OWNER TO postgres;
+
+--
+-- Name: check_email_trigger(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.check_email_trigger() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $_$
+BEGIN
+    IF NEW.email !~ '^[A-Za-z0-9._%-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$' THEN
+        RAISE EXCEPTION 'Некорректный email: должен содержать только латиницу и иметь формат имя@домен.зона';
+    END IF;
+    RETURN NEW;
+END;
+$_$;
+
+
+ALTER FUNCTION public.check_email_trigger() OWNER TO postgres;
+
+--
+-- Name: check_publisher_phone(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.check_publisher_phone() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $_$
+BEGIN
+    IF NEW.contactnum !~ '^[0-9]+$' THEN
+        RAISE EXCEPTION 'Номер телефона должен содержать только цифры';
+    END IF;
+    RETURN NEW;
+END;
+$_$;
+
+
+ALTER FUNCTION public.check_publisher_phone() OWNER TO postgres;
+
+--
+-- Name: deleteorder(integer); Type: PROCEDURE; Schema: public; Owner: postgres
+--
+
+CREATE PROCEDURE public.deleteorder(IN p_order_id integer)
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    DELETE FROM OrderDetails WHERE Order_ID = p_order_id;
+    DELETE FROM Orders WHERE ID_Order = p_order_id;
+
+    RAISE NOTICE 'Заказ % и его детали удалены.', p_order_id;
+END;
+$$;
+
+
+ALTER PROCEDURE public.deleteorder(IN p_order_id integer) OWNER TO postgres;
+
+--
+-- Name: get_income_period(integer); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.get_income_period(p_days integer) RETURNS numeric
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    total_income NUMERIC;
+BEGIN
+    SELECT SUM(od.price * od.quantity) INTO total_income
+    FROM orders o
+    JOIN orderdetails od ON o.id_order = od.order_id
+    WHERE o.orderdate >= NOW() - (p_days || ' days')::INTERVAL;
+
+    RETURN COALESCE(total_income, 0);
+END;
+$$;
+
+
+ALTER FUNCTION public.get_income_period(p_days integer) OWNER TO postgres;
+
+--
+-- Name: get_top_books_period(integer, integer); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.get_top_books_period(p_days integer, p_limit integer) RETURNS TABLE(book_id integer, title character varying, total_sold bigint)
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    RETURN QUERY
+    SELECT b.id_book,
+           b.title,
+           SUM(od.quantity) AS total_sold
+    FROM orderdetails od
+    JOIN orders o ON od.order_id = o.id_order
+    JOIN books b ON od.book_id = b.id_book
+    WHERE o.orderdate >= NOW() - (p_days || ' days')::INTERVAL
+    GROUP BY b.id_book, b.title
+    ORDER BY total_sold DESC
+    LIMIT p_limit;
+END;
+$$;
+
+
+ALTER FUNCTION public.get_top_books_period(p_days integer, p_limit integer) OWNER TO postgres;
+
+--
+-- Name: get_top_users_period(integer, integer); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.get_top_users_period(p_days integer, p_limit integer) RETURNS TABLE(user_id integer, fullname character varying, total_spent numeric)
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    RETURN QUERY
+    SELECT u.id_user,
+           (u.lastname || ' ' || u.firstname)::VARCHAR,
+           SUM(od.price * od.quantity) AS total_spent
+    FROM users u
+    JOIN orders o ON u.id_user = o.user_id
+    JOIN orderdetails od ON o.id_order = od.order_id
+    WHERE o.orderdate >= NOW() - (p_days || ' days')::INTERVAL
+    GROUP BY u.id_user, u.lastname, u.firstname
+    ORDER BY total_spent DESC
+    LIMIT p_limit;
+END;
+$$;
+
+
+ALTER FUNCTION public.get_top_users_period(p_days integer, p_limit integer) OWNER TO postgres;
+
+--
+-- Name: get_user_avg_check_period(integer, integer); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.get_user_avg_check_period(p_user_id integer, p_days integer) RETURNS numeric
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    avg_check NUMERIC;
+BEGIN
+    SELECT AVG(sum_order) INTO avg_check
+    FROM (
+        SELECT SUM(od.price * od.quantity) AS sum_order
+        FROM orders o
+        JOIN orderdetails od ON o.id_order = od.order_id
+        WHERE o.user_id = p_user_id
+          AND o.orderdate >= NOW() - (p_days || ' days')::INTERVAL
+        GROUP BY o.id_order
+    ) sub;
+
+    RETURN COALESCE(avg_check, 0);
+END;
+$$;
+
+
+ALTER FUNCTION public.get_user_avg_check_period(p_user_id integer, p_days integer) OWNER TO postgres;
+
+--
+-- Name: log_changes(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.log_changes() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $_$
+DECLARE
+  key_field TEXT;
+  key_value INT;
+  user_login TEXT;
+BEGIN
+  SELECT column_name INTO key_field
+  FROM information_schema.columns
+  WHERE table_name = TG_TABLE_NAME
+    AND column_name ILIKE 'id_%'
+  LIMIT 1;
+
+  BEGIN
+    user_login := current_setting('app.current_user', true);
+  EXCEPTION
+    WHEN others THEN
+      user_login := 'anonymous';
+  END;
+
+  IF TG_OP = 'UPDATE' THEN
+    EXECUTE format('SELECT ($1).%I', key_field) INTO key_value USING NEW;
+    INSERT INTO AuditLog (TableName, Record_ID, Action, ChangedBy, OldValue, NewValue)
+    VALUES (TG_TABLE_NAME, key_value, 'UPDATE', user_login, row_to_json(OLD), row_to_json(NEW));
+
+  ELSIF TG_OP = 'DELETE' THEN
+    EXECUTE format('SELECT ($1).%I', key_field) INTO key_value USING OLD;
+    INSERT INTO AuditLog (TableName, Record_ID, Action, ChangedBy, OldValue)
+    VALUES (TG_TABLE_NAME, key_value, 'DELETE', user_login, row_to_json(OLD));
+
+  ELSIF TG_OP = 'INSERT' THEN
+    EXECUTE format('SELECT ($1).%I', key_field) INTO key_value USING NEW;
+    INSERT INTO AuditLog (TableName, Record_ID, Action, ChangedBy, NewValue)
+    VALUES (TG_TABLE_NAME, key_value, 'INSERT', user_login, row_to_json(NEW));
+  END IF;
+
+  RETURN NULL;
+END;
+$_$;
+
+
+ALTER FUNCTION public.log_changes() OWNER TO postgres;
+
+--
+-- Name: reduce_book_quantity(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.reduce_book_quantity() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    UPDATE books
+    SET quantity = quantity - NEW.quantity
+    WHERE id_book = NEW.book_id;
+
+    IF (SELECT quantity FROM books WHERE id_book = NEW.book_id) < 0 THEN
+        RAISE EXCEPTION 'Недостаточно книг на складе (book_id = %)', NEW.book_id;
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.reduce_book_quantity() OWNER TO postgres;
+
+--
+-- Name: registeruser(character varying, character varying, integer, character varying, character varying, character varying, character varying); Type: PROCEDURE; Schema: public; Owner: postgres
+--
+
+CREATE PROCEDURE public.registeruser(IN p_login character varying, IN p_hashpassword character varying, IN p_role_id integer, IN p_lastname character varying, IN p_firstname character varying, IN p_patronymic character varying, IN p_email character varying)
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_account_id INT;
+BEGIN
+    INSERT INTO Accounts (Login, HashPassword, Role_ID)
+    VALUES (p_login, p_hashpassword, p_role_id)
+    RETURNING ID_Account INTO v_account_id;
+
+    INSERT INTO Users (Lastname, Firstname, Patronymic, Email, Account_ID)
+    VALUES (p_lastname, p_firstname, p_patronymic, p_email, v_account_id);
+
+    RAISE NOTICE 'Пользователь % успешно зарегистрирован.', p_login;
+END;
+$$;
+
+
+ALTER PROCEDURE public.registeruser(IN p_login character varying, IN p_hashpassword character varying, IN p_role_id integer, IN p_lastname character varying, IN p_firstname character varying, IN p_patronymic character varying, IN p_email character varying) OWNER TO postgres;
+
+--
+-- Name: restore_books_on_cancel(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.restore_books_on_cancel() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF NEW.Status_ID <> OLD.Status_ID AND NEW.Status_ID = 3 THEN
+    
+    UPDATE Books b
+    SET Quantity = b.Quantity + od.Quantity
+    FROM OrderDetails od
+    WHERE od.Book_ID = b.ID_Book
+      AND od.Order_ID = NEW.ID_Order;
+
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.restore_books_on_cancel() OWNER TO postgres;
+
+--
+-- Name: set_default_order_status(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.set_default_order_status() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF NEW.status_id IS NULL THEN
+        NEW.status_id := (SELECT id_status FROM statuses WHERE status = 'Новый' LIMIT 1);
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.set_default_order_status() OWNER TO postgres;
+
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
+--
+-- Name: accounts; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.accounts (
+    id_account integer NOT NULL,
+    login character varying(30) NOT NULL,
+    hashpassword character varying(255) NOT NULL,
+    role_id integer NOT NULL,
+    CONSTRAINT accounts_login_check CHECK (((login)::text ~ '^[A-Za-z0-9_]{3,}$'::text))
+);
+
+
+ALTER TABLE public.accounts OWNER TO postgres;
+
+--
+-- Name: accounts_id_account_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.accounts_id_account_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.accounts_id_account_seq OWNER TO postgres;
+
+--
+-- Name: accounts_id_account_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.accounts_id_account_seq OWNED BY public.accounts.id_account;
+
+
+--
+-- Name: addresses; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.addresses (
+    id_address integer NOT NULL,
+    country character varying(100) NOT NULL,
+    city character varying(100) NOT NULL,
+    street character varying(100) NOT NULL,
+    house integer NOT NULL,
+    apartment integer,
+    indexmail character varying(8) NOT NULL
+);
+
+
+ALTER TABLE public.addresses OWNER TO postgres;
+
+--
+-- Name: addresses_id_address_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.addresses_id_address_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.addresses_id_address_seq OWNER TO postgres;
+
+--
+-- Name: addresses_id_address_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.addresses_id_address_seq OWNED BY public.addresses.id_address;
+
+
+--
+-- Name: auditlog; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.auditlog (
+    id_audit integer NOT NULL,
+    tablename text NOT NULL,
+    record_id integer,
+    action text NOT NULL,
+    changedby text,
+    changedat timestamp without time zone DEFAULT now(),
+    oldvalue jsonb,
+    newvalue jsonb
+);
+
+
+ALTER TABLE public.auditlog OWNER TO postgres;
+
+--
+-- Name: auditlog_id_audit_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.auditlog_id_audit_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.auditlog_id_audit_seq OWNER TO postgres;
+
+--
+-- Name: auditlog_id_audit_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.auditlog_id_audit_seq OWNED BY public.auditlog.id_audit;
+
+
+--
+-- Name: authors; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.authors (
+    id_author integer NOT NULL,
+    lastname character varying(80) NOT NULL,
+    firstname character varying(80) NOT NULL,
+    patronymic character varying(80),
+    birthdate date,
+    deathdate date
+);
+
+
+ALTER TABLE public.authors OWNER TO postgres;
+
+--
+-- Name: authors_id_author_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.authors_id_author_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.authors_id_author_seq OWNER TO postgres;
+
+--
+-- Name: authors_id_author_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.authors_id_author_seq OWNED BY public.authors.id_author;
+
+
+--
+-- Name: books; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.books (
+    id_book integer NOT NULL,
+    title character varying(150) NOT NULL,
+    description text,
+    publishdate date,
+    author_id integer NOT NULL,
+    publisher_id integer,
+    category_id integer,
+    price numeric(10,2) NOT NULL,
+    quantity integer NOT NULL,
+    imageurl text,
+    CONSTRAINT books_quantity_check CHECK ((quantity > 0))
+);
+
+
+ALTER TABLE public.books OWNER TO postgres;
+
+--
+-- Name: books_id_book_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.books_id_book_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.books_id_book_seq OWNER TO postgres;
+
+--
+-- Name: books_id_book_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.books_id_book_seq OWNED BY public.books.id_book;
+
+
+--
+-- Name: categories; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.categories (
+    id_category integer NOT NULL,
+    name character varying(50) NOT NULL
+);
+
+
+ALTER TABLE public.categories OWNER TO postgres;
+
+--
+-- Name: publishers; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.publishers (
+    id_publisher integer NOT NULL,
+    legalname character varying(1000) NOT NULL,
+    contactnum character varying(11) NOT NULL,
+    email character varying(80) NOT NULL,
+    address_id integer
+);
+
+
+ALTER TABLE public.publishers OWNER TO postgres;
+
+--
+-- Name: booksview; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.booksview AS
+ SELECT b.id_book AS "Код книги",
+    b.title AS "Название",
+    (((a.firstname)::text || ' '::text) || (a.lastname)::text) AS "Автор",
+    c.name AS "Категория",
+    p.legalname AS "Издатель",
+    b.price AS "Цена",
+    b.quantity AS "Количество"
+   FROM (((public.books b
+     JOIN public.authors a ON ((b.author_id = a.id_author)))
+     LEFT JOIN public.categories c ON ((b.category_id = c.id_category)))
+     LEFT JOIN public.publishers p ON ((b.publisher_id = p.id_publisher)));
+
+
+ALTER VIEW public.booksview OWNER TO postgres;
+
+--
+-- Name: categories_id_category_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.categories_id_category_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.categories_id_category_seq OWNER TO postgres;
+
+--
+-- Name: categories_id_category_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.categories_id_category_seq OWNED BY public.categories.id_category;
+
+
+--
+-- Name: deliverytypes; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.deliverytypes (
+    id_deliverytype integer NOT NULL,
+    typename character varying(40) NOT NULL
+);
+
+
+ALTER TABLE public.deliverytypes OWNER TO postgres;
+
+--
+-- Name: deliverytypes_id_deliverytype_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.deliverytypes_id_deliverytype_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.deliverytypes_id_deliverytype_seq OWNER TO postgres;
+
+--
+-- Name: deliverytypes_id_deliverytype_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.deliverytypes_id_deliverytype_seq OWNED BY public.deliverytypes.id_deliverytype;
+
+
+--
+-- Name: orderdetails; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.orderdetails (
+    id_orderdetail integer NOT NULL,
+    order_id integer NOT NULL,
+    price numeric(10,2) NOT NULL,
+    quantity integer NOT NULL,
+    book_id integer NOT NULL,
+    CONSTRAINT orderdetails_quantity_check CHECK ((quantity > 0))
+);
+
+
+ALTER TABLE public.orderdetails OWNER TO postgres;
+
+--
+-- Name: orderdetails_id_orderdetail_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.orderdetails_id_orderdetail_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.orderdetails_id_orderdetail_seq OWNER TO postgres;
+
+--
+-- Name: orderdetails_id_orderdetail_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.orderdetails_id_orderdetail_seq OWNED BY public.orderdetails.id_orderdetail;
+
+
+--
+-- Name: orders; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.orders (
+    id_order integer NOT NULL,
+    orderdate timestamp without time zone NOT NULL,
+    user_id integer NOT NULL,
+    status_id integer NOT NULL,
+    deliverytype_id integer,
+    address_id integer
+);
+
+
+ALTER TABLE public.orders OWNER TO postgres;
+
+--
+-- Name: orderdetailsview; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.orderdetailsview AS
+ SELECT od.id_orderdetail AS "Код детали",
+    o.id_order AS "Код заказа",
+    b.title AS "Книга",
+    od.quantity AS "Кол-во",
+    od.price AS "Цена за единицу",
+    ((od.quantity)::numeric * od.price) AS "Сумма"
+   FROM ((public.orderdetails od
+     JOIN public.orders o ON ((od.order_id = o.id_order)))
+     JOIN public.books b ON ((od.book_id = b.id_book)));
+
+
+ALTER VIEW public.orderdetailsview OWNER TO postgres;
+
+--
+-- Name: orders_id_order_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.orders_id_order_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.orders_id_order_seq OWNER TO postgres;
+
+--
+-- Name: orders_id_order_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.orders_id_order_seq OWNED BY public.orders.id_order;
+
+
+--
+-- Name: statuses; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.statuses (
+    id_status integer NOT NULL,
+    status character varying(40) NOT NULL
+);
+
+
+ALTER TABLE public.statuses OWNER TO postgres;
+
+--
+-- Name: users; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.users (
+    id_user integer NOT NULL,
+    lastname character varying(80) NOT NULL,
+    firstname character varying(80) NOT NULL,
+    patronymic character varying(80),
+    email character varying(80) NOT NULL,
+    account_id integer
+);
+
+
+ALTER TABLE public.users OWNER TO postgres;
+
+--
+-- Name: ordersview; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.ordersview AS
+ SELECT o.id_order AS "Код заказа",
+    o.orderdate AS "Дата заказа",
+    (((u.lastname)::text || ' '::text) || (u.firstname)::text) AS "Покупатель",
+    s.status AS "Статус",
+    d.typename AS "Тип доставки",
+    ((((((a.city)::text || ', '::text) || (a.street)::text) || ' '::text) || a.house) || COALESCE((', кв. '::text || a.apartment), ''::text)) AS "Адрес доставки"
+   FROM ((((public.orders o
+     JOIN public.users u ON ((o.user_id = u.id_user)))
+     JOIN public.statuses s ON ((o.status_id = s.id_status)))
+     LEFT JOIN public.deliverytypes d ON ((o.deliverytype_id = d.id_deliverytype)))
+     LEFT JOIN public.addresses a ON ((o.address_id = a.id_address)));
+
+
+ALTER VIEW public.ordersview OWNER TO postgres;
+
+--
+-- Name: publishers_id_publisher_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.publishers_id_publisher_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.publishers_id_publisher_seq OWNER TO postgres;
+
+--
+-- Name: publishers_id_publisher_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.publishers_id_publisher_seq OWNED BY public.publishers.id_publisher;
+
+
+--
+-- Name: reviews; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.reviews (
+    id_review integer NOT NULL,
+    user_id integer NOT NULL,
+    book_id integer NOT NULL,
+    rating integer NOT NULL,
+    usercomment text,
+    reviewdate timestamp without time zone NOT NULL,
+    CONSTRAINT reviews_rating_check CHECK (((rating >= 1) AND (rating <= 5)))
+);
+
+
+ALTER TABLE public.reviews OWNER TO postgres;
+
+--
+-- Name: reviews_id_review_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.reviews_id_review_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.reviews_id_review_seq OWNER TO postgres;
+
+--
+-- Name: reviews_id_review_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.reviews_id_review_seq OWNED BY public.reviews.id_review;
+
+
+--
+-- Name: roles; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.roles (
+    id_role integer NOT NULL,
+    rolename character varying(40) NOT NULL
+);
+
+
+ALTER TABLE public.roles OWNER TO postgres;
+
+--
+-- Name: roles_id_role_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.roles_id_role_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.roles_id_role_seq OWNER TO postgres;
+
+--
+-- Name: roles_id_role_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.roles_id_role_seq OWNED BY public.roles.id_role;
+
+
+--
+-- Name: statuses_id_status_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.statuses_id_status_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.statuses_id_status_seq OWNER TO postgres;
+
+--
+-- Name: statuses_id_status_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.statuses_id_status_seq OWNED BY public.statuses.id_status;
+
+
+--
+-- Name: topbooksview; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.topbooksview AS
+ SELECT b.title AS "Название книги",
+    count(r.id_review) AS "Кол-во отзывов",
+    round(avg(r.rating), 2) AS "Средняя оценка"
+   FROM (public.books b
+     LEFT JOIN public.reviews r ON ((b.id_book = r.book_id)))
+  GROUP BY b.title
+  ORDER BY (round(avg(r.rating), 2)) DESC, (count(r.id_review)) DESC;
+
+
+ALTER VIEW public.topbooksview OWNER TO postgres;
+
+--
+-- Name: topusersview; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.topusersview AS
+ SELECT u.id_user,
+    (((((u.lastname)::text || ' '::text) || (u.firstname)::text) || ' '::text) || (COALESCE(u.patronymic, ''::character varying))::text) AS username,
+    count(o.id_order) AS total_orders,
+    sum(((od.quantity)::numeric * b.price)) AS total_spent
+   FROM (((public.users u
+     JOIN public.orders o ON ((u.id_user = o.user_id)))
+     JOIN public.orderdetails od ON ((o.id_order = od.order_id)))
+     JOIN public.books b ON ((od.book_id = b.id_book)))
+  GROUP BY u.id_user, u.lastname, u.firstname, u.patronymic
+  ORDER BY (sum(((od.quantity)::numeric * b.price))) DESC
+ LIMIT 10;
+
+
+ALTER VIEW public.topusersview OWNER TO postgres;
+
+--
+-- Name: users_id_user_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.users_id_user_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.users_id_user_seq OWNER TO postgres;
+
+--
+-- Name: users_id_user_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.users_id_user_seq OWNED BY public.users.id_user;
+
+
+--
+-- Name: usersaccountsview; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.usersaccountsview AS
+ SELECT u.id_user AS "Код пользователя",
+    u.lastname AS "Фамилия",
+    u.firstname AS "Имя",
+    u.email AS "Эл. почта",
+    a.login AS "Логин",
+    r.rolename AS "Роль"
+   FROM ((public.users u
+     JOIN public.accounts a ON ((u.account_id = a.id_account)))
+     JOIN public.roles r ON ((a.role_id = r.id_role)));
+
+
+ALTER VIEW public.usersaccountsview OWNER TO postgres;
+
+--
+-- Name: accounts id_account; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.accounts ALTER COLUMN id_account SET DEFAULT nextval('public.accounts_id_account_seq'::regclass);
+
+
+--
+-- Name: addresses id_address; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.addresses ALTER COLUMN id_address SET DEFAULT nextval('public.addresses_id_address_seq'::regclass);
+
+
+--
+-- Name: auditlog id_audit; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.auditlog ALTER COLUMN id_audit SET DEFAULT nextval('public.auditlog_id_audit_seq'::regclass);
+
+
+--
+-- Name: authors id_author; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.authors ALTER COLUMN id_author SET DEFAULT nextval('public.authors_id_author_seq'::regclass);
+
+
+--
+-- Name: books id_book; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.books ALTER COLUMN id_book SET DEFAULT nextval('public.books_id_book_seq'::regclass);
+
+
+--
+-- Name: categories id_category; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.categories ALTER COLUMN id_category SET DEFAULT nextval('public.categories_id_category_seq'::regclass);
+
+
+--
+-- Name: deliverytypes id_deliverytype; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.deliverytypes ALTER COLUMN id_deliverytype SET DEFAULT nextval('public.deliverytypes_id_deliverytype_seq'::regclass);
+
+
+--
+-- Name: orderdetails id_orderdetail; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.orderdetails ALTER COLUMN id_orderdetail SET DEFAULT nextval('public.orderdetails_id_orderdetail_seq'::regclass);
+
+
+--
+-- Name: orders id_order; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.orders ALTER COLUMN id_order SET DEFAULT nextval('public.orders_id_order_seq'::regclass);
+
+
+--
+-- Name: publishers id_publisher; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.publishers ALTER COLUMN id_publisher SET DEFAULT nextval('public.publishers_id_publisher_seq'::regclass);
+
+
+--
+-- Name: reviews id_review; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.reviews ALTER COLUMN id_review SET DEFAULT nextval('public.reviews_id_review_seq'::regclass);
+
+
+--
+-- Name: roles id_role; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.roles ALTER COLUMN id_role SET DEFAULT nextval('public.roles_id_role_seq'::regclass);
+
+
+--
+-- Name: statuses id_status; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.statuses ALTER COLUMN id_status SET DEFAULT nextval('public.statuses_id_status_seq'::regclass);
+
+
+--
+-- Name: users id_user; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.users ALTER COLUMN id_user SET DEFAULT nextval('public.users_id_user_seq'::regclass);
+
+
+--
+-- Data for Name: accounts; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.accounts (id_account, login, hashpassword, role_id) FROM stdin;
+4	petroshaaaaaa	$2a$06$sA0hl58h6Ky8XjTa9BX6a.KNj1hsD9xJMP.R7WkJnXQIFppMUUE/a	2
+6	iv4n	$2a$06$2k3iE006eTGyTj5DQ7ru0OdYhIoC/1T/3k4nBS0ZjHgfX6uSJGxTe	2
+5	aln	$2a$06$x3HDmMMxZjGEHeX5.YYse.Deac2W2eklrSJ1.TushngVhhiHotDD6	1
+11	mitko	$2a$06$Yb8CAxZE/z0XMP/kPANWa.ebBJnBle5xdxUKJnAjXk7nInPQMluT2	2
+\.
+
+
+--
+-- Data for Name: addresses; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.addresses (id_address, country, city, street, house, apartment, indexmail) FROM stdin;
+1	Россия	Москва	Тверская	10	15	101000
+2	Россия	Санкт-Петербург	Невский проспект	25	\N	190000
+3	Россия	Сургут	Польская	8	19	109678
+4	Россия	Томск	Вавилова	7	45	10394
+5	Россия	Томск	Вавилова	7	45	103945
+6	Россия	Томск	Вавилова	5	67	125909
+7	Россия	Санкт-Петербург	Херсонская	12	14	103903
+8	Россия	Москва	Лермонтова	34	2	103989
+9	Россия	Москва	Пушкина	67	\N	423046
+10	Франция	Париж	Rue de Rivoli	45	2	75001
+\.
+
+
+--
+-- Data for Name: auditlog; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.auditlog (id_audit, tablename, record_id, action, changedby, changedat, oldvalue, newvalue) FROM stdin;
+60	reviews	9	INSERT	iv4n	2025-10-17 15:23:13.488373	\N	{"rating": 3, "book_id": 2, "user_id": 5, "id_review": 9, "reviewdate": "2025-10-17T15:23:13.488373", "usercomment": "ну, так себе"}
+76	orders	3	UPDATE	petroshaaaaaa	2025-10-17 16:37:33.001581	{"user_id": 3, "id_order": 3, "orderdate": "2025-10-16T16:24:47.542956", "status_id": 1, "address_id": 1, "deliverytype_id": 1}	{"user_id": 3, "id_order": 3, "orderdate": "2025-10-16T16:24:47.542956", "status_id": 3, "address_id": 1, "deliverytype_id": 1}
+77	books	2	UPDATE	petroshaaaaaa	2025-10-17 16:37:33.001581	{"price": 1200.00, "title": "Война и мир", "id_book": 2, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000166531/COVER/cover1__w820.webp", "quantity": 2, "author_id": 2, "category_id": 1, "description": "\\"Война и мир\\" – роман-эпопея Льва Николаевича Толстого, по глубине и охвату событий до сих пор стоящий на первом месте во всей мировой литературе, - вершина творчества великого мыслителя, как никакое другое произведение писателя отражает глубину его мироощущения и философии", "publishdate": "1869-01-01", "publisher_id": 2}	{"price": 1200.00, "title": "Война и мир", "id_book": 2, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000166531/COVER/cover1__w820.webp", "quantity": 4, "author_id": 2, "category_id": 1, "description": "\\"Война и мир\\" – роман-эпопея Льва Николаевича Толстого, по глубине и охвату событий до сих пор стоящий на первом месте во всей мировой литературе, - вершина творчества великого мыслителя, как никакое другое произведение писателя отражает глубину его мироощущения и философии", "publishdate": "1869-01-01", "publisher_id": 2}
+85	books	1	UPDATE	aln	2025-10-20 12:47:42.859913	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.ast.ru/v2/ASE000000000830384/COVER/cover1__w410.jpg", "quantity": 7, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.ast.ru/v2/ASE000000000830384/COVER/cover1__w410.jpg", "quantity": 7, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+86	books	1	UPDATE	aln	2025-10-20 12:47:44.493083	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.ast.ru/v2/ASE000000000830384/COVER/cover1__w410.jpg", "quantity": 7, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.ast.ru/v2/ASE000000000830384/COVER/cover1__w410.jpg", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+145	books	8	INSERT	aln	2025-10-26 11:50:45.545589	\N	{"price": 300.00, "title": "Капитанская дочка", "id_book": 8, "imageurl": "https://cdn.ast.ru/v2/ASE000000000864873/COVER/cover1__w410.jpg", "quantity": 15, "author_id": 1, "category_id": 4, "description": "Повествование ведется от лица главного героя – потомственного дворянина Петра Андреевича Гринёва, который спустя много лет описывает в своем дневнике события давних времен. Он рассказывает о своем детстве, о том как на семнадцатом году отец послал его на службу в Оренбург, а оттуда молодого барина отправили в еще большую глушь – Белогорскую крепость. Командовал белогорским гарнизоном капитан Иван Кузьмич Миронов, и у него была дочь Маша…", "publishdate": null, "publisher_id": 1}
+61	reviews	9	DELETE	iv4n	2025-10-17 15:23:27.676073	{"rating": 3, "book_id": 2, "user_id": 5, "id_review": 9, "reviewdate": "2025-10-17T15:23:13.488373", "usercomment": "ну, так себе"}	\N
+146	orders	24	DELETE	aln	2025-10-26 12:03:34.223666	{"user_id": 5, "id_order": 24, "orderdate": "2025-10-17T14:16:26.622224", "status_id": 3, "address_id": 4, "deliverytype_id": 1}	\N
+78	books	1	UPDATE	aln	2025-10-20 12:44:15.24265	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.ast.ru/v2/ASE000000000830384/COVER/cover1__w410.jpg", "quantity": 7, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.ast.ru/v2/ASE000000000830384/COVER/cover1__w410.jpg", "quantity": 7, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+79	books	1	UPDATE	aln	2025-10-20 12:44:17.814696	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.ast.ru/v2/ASE000000000830384/COVER/cover1__w410.jpg", "quantity": 7, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.ast.ru/v2/ASE000000000830384/COVER/cover1__w410.jpg", "quantity": 7, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+87	books	2	UPDATE	aln	2025-10-20 12:48:12.593202	{"price": 1200.00, "title": "Война и мир", "id_book": 2, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000166531/COVER/cover1__w820.webp", "quantity": 4, "author_id": 2, "category_id": 1, "description": "\\"Война и мир\\" – роман-эпопея Льва Николаевича Толстого, по глубине и охвату событий до сих пор стоящий на первом месте во всей мировой литературе, - вершина творчества великого мыслителя, как никакое другое произведение писателя отражает глубину его мироощущения и философии", "publishdate": "1869-01-01", "publisher_id": 2}	{"price": 1200.00, "title": "Война и мир", "id_book": 2, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000166531/COVER/cover1__w820.webp", "quantity": 4, "author_id": 2, "category_id": 1, "description": "\\"Война и мир\\" – роман-эпопея Льва Николаевича Толстого, по глубине и охвату событий до сих пор стоящий на первом месте во всей мировой литературе, - вершина творчества великого мыслителя, как никакое другое произведение писателя отражает глубину его мироощущения и философии", "publishdate": "1869-01-01", "publisher_id": 2}
+88	books	2	UPDATE	aln	2025-10-20 12:48:14.326339	{"price": 1200.00, "title": "Война и мир", "id_book": 2, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000166531/COVER/cover1__w820.webp", "quantity": 4, "author_id": 2, "category_id": 1, "description": "\\"Война и мир\\" – роман-эпопея Льва Николаевича Толстого, по глубине и охвату событий до сих пор стоящий на первом месте во всей мировой литературе, - вершина творчества великого мыслителя, как никакое другое произведение писателя отражает глубину его мироощущения и философии", "publishdate": "1869-01-01", "publisher_id": 2}	{"price": 1200.00, "title": "Война и мир", "id_book": 2, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000166531/COVER/cover1__w820.webp", "quantity": 5, "author_id": 2, "category_id": 1, "description": "\\"Война и мир\\" – роман-эпопея Льва Николаевича Толстого, по глубине и охвату событий до сих пор стоящий на первом месте во всей мировой литературе, - вершина творчества великого мыслителя, как никакое другое произведение писателя отражает глубину его мироощущения и философии", "publishdate": "1869-01-01", "publisher_id": 2}
+158	users	9	UPDATE	mitko	2025-11-11 11:45:34.796686	{"email": "mitko@xn--80a1acny", "id_user": 9, "lastname": "Митько", "firstname": "Василий", "account_id": 11, "patronymic": ""}	{"email": "mitko@mail", "id_user": 9, "lastname": "Митько", "firstname": "Василий", "account_id": 11, "patronymic": null}
+62	reviews	10	INSERT	iv4n	2025-10-17 15:23:48.685532	\N	{"rating": 2, "book_id": 2, "user_id": 5, "id_review": 10, "reviewdate": "2025-10-17T15:23:48.685532", "usercomment": "мне не зашло"}
+147	orders	27	UPDATE	aln	2025-10-26 12:04:23.700201	{"user_id": 5, "id_order": 27, "orderdate": "2025-10-17T14:19:37.285995", "status_id": 1, "address_id": null, "deliverytype_id": 2}	{"user_id": 5, "id_order": 27, "orderdate": "2025-10-17T14:19:37.285995", "status_id": 2, "address_id": null, "deliverytype_id": 2}
+80	books	1	UPDATE	aln	2025-10-20 12:44:45.128499	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.ast.ru/v2/ASE000000000830384/COVER/cover1__w410.jpg", "quantity": 7, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.ast.ru/v2/ASE000000000830384/COVER/cover1__w410.jpg", "quantity": 7, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+89	users	4	UPDATE	aln	2025-10-20 12:49:43.950967	{"email": "isip_a.a.gladkova@mpt.ru", "id_user": 4, "lastname": "Гладкова", "firstname": "Алёна", "account_id": 5, "patronymic": "Александровна"}	{"email": "isip_a.a.gladkova@mpt.ru", "id_user": 4, "lastname": "Гладкова", "firstname": "Алёна", "account_id": 5, "patronymic": "Александровна"}
+90	accounts	5	UPDATE	aln	2025-10-20 12:49:43.99051	{"login": "aln", "role_id": 1, "id_account": 5, "hashpassword": "$2a$06$x3HDmMMxZjGEHeX5.YYse.Deac2W2eklrSJ1.TushngVhhiHotDD6"}	{"login": "alna", "role_id": 1, "id_account": 5, "hashpassword": "$2a$06$x3HDmMMxZjGEHeX5.YYse.Deac2W2eklrSJ1.TushngVhhiHotDD6"}
+91	users	4	UPDATE	alna	2025-10-20 12:49:49.801209	{"email": "isip_a.a.gladkova@mpt.ru", "id_user": 4, "lastname": "Гладкова", "firstname": "Алёна", "account_id": 5, "patronymic": "Александровна"}	{"email": "isip_a.a.gladkova@mpt.ru", "id_user": 4, "lastname": "Гладкова", "firstname": "Алёна", "account_id": 5, "patronymic": "Александровна"}
+92	accounts	5	UPDATE	alna	2025-10-20 12:49:49.821471	{"login": "alna", "role_id": 1, "id_account": 5, "hashpassword": "$2a$06$x3HDmMMxZjGEHeX5.YYse.Deac2W2eklrSJ1.TushngVhhiHotDD6"}	{"login": "aln", "role_id": 1, "id_account": 5, "hashpassword": "$2a$06$x3HDmMMxZjGEHeX5.YYse.Deac2W2eklrSJ1.TushngVhhiHotDD6"}
+95	books	1	UPDATE	aln	2025-10-20 12:51:21.922675	{"price": 351.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.ast.ru/v2/ASE000000000830384/COVER/cover1__w410.jpg", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 351.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.ast.ru/v2/ASE000000000830384/COVER/cover1__w410.jpg", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+96	books	1	UPDATE	aln	2025-10-20 12:51:23.73851	{"price": 351.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.ast.ru/v2/ASE000000000830384/COVER/cover1__w410.jpg", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 351.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.ast.ru/v2/ASE000000000830384/COVER/cover1__w410.jpg", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+63	orders	17	UPDATE	iv4n	2025-10-17 15:51:25.902048	{"user_id": 5, "id_order": 17, "orderdate": "2025-10-17T13:27:19.832263", "status_id": 1, "address_id": null, "deliverytype_id": 2}	{"user_id": 5, "id_order": 17, "orderdate": "2025-10-17T13:27:19.832263", "status_id": 3, "address_id": null, "deliverytype_id": 2}
+64	orders	20	UPDATE	iv4n	2025-10-17 15:51:47.358069	{"user_id": 5, "id_order": 20, "orderdate": "2025-10-17T13:51:46.114974", "status_id": 1, "address_id": null, "deliverytype_id": 2}	{"user_id": 5, "id_order": 20, "orderdate": "2025-10-17T13:51:46.114974", "status_id": 3, "address_id": null, "deliverytype_id": 2}
+65	orders	24	UPDATE	iv4n	2025-10-17 15:51:50.30083	{"user_id": 5, "id_order": 24, "orderdate": "2025-10-17T14:16:26.622224", "status_id": 1, "address_id": 4, "deliverytype_id": 1}	{"user_id": 5, "id_order": 24, "orderdate": "2025-10-17T14:16:26.622224", "status_id": 3, "address_id": 4, "deliverytype_id": 1}
+148	reviews	13	INSERT	petroshaaaaaa	2025-10-26 12:21:30.205455	\N	{"rating": 4, "book_id": 5, "user_id": 3, "id_review": 13, "reviewdate": "2025-10-26T12:21:30.205455", "usercomment": "слишком тяжело читать... но мне нравится"}
+81	books	1	UPDATE	aln	2025-10-20 12:45:14.803614	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.ast.ru/v2/ASE000000000830384/COVER/cover1__w410.jpg", "quantity": 7, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.ast.ru/v2/ASE000000000830384/COVER/cover1__w410.jpg", "quantity": 7, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+93	books	1	UPDATE	aln	2025-10-20 12:51:13.970879	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.ast.ru/v2/ASE000000000830384/COVER/cover1__w410.jpg", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.ast.ru/v2/ASE000000000830384/COVER/cover1__w410.jpg", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+94	books	1	UPDATE	aln	2025-10-20 12:51:15.588037	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.ast.ru/v2/ASE000000000830384/COVER/cover1__w410.jpg", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 351.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.ast.ru/v2/ASE000000000830384/COVER/cover1__w410.jpg", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+130	orders	22	DELETE	aln	2025-10-21 10:40:30.854037	{"user_id": 5, "id_order": 22, "orderdate": "2025-10-17T13:57:09.532501", "status_id": 1, "address_id": null, "deliverytype_id": 2}	\N
+131	orders	21	DELETE	aln	2025-10-21 10:40:32.534834	{"user_id": 5, "id_order": 21, "orderdate": "2025-10-17T13:52:51.383412", "status_id": 1, "address_id": null, "deliverytype_id": 2}	\N
+132	orders	20	DELETE	aln	2025-10-21 10:40:38.759605	{"user_id": 5, "id_order": 20, "orderdate": "2025-10-17T13:51:46.114974", "status_id": 3, "address_id": null, "deliverytype_id": 2}	\N
+149	reviews	13	DELETE	petroshaaaaaa	2025-10-26 12:21:58.573063	{"rating": 4, "book_id": 5, "user_id": 3, "id_review": 13, "reviewdate": "2025-10-26T12:21:30.205455", "usercomment": "слишком тяжело читать... но мне нравится"}	\N
+72	orders	13	UPDATE	petroshaaaaaa	2025-10-17 16:14:20.727263	{"user_id": 3, "id_order": 13, "orderdate": "2025-10-16T17:40:35.529984", "status_id": 1, "address_id": 1, "deliverytype_id": 1}	{"user_id": 3, "id_order": 13, "orderdate": "2025-10-16T17:40:35.529984", "status_id": 3, "address_id": 1, "deliverytype_id": 1}
+73	books	2	UPDATE	petroshaaaaaa	2025-10-17 16:14:20.727263	{"price": 1200.00, "title": "Война и мир", "id_book": 2, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000166531/COVER/cover1__w820.webp", "quantity": 1, "author_id": 2, "category_id": 1, "description": "\\"Война и мир\\" – роман-эпопея Льва Николаевича Толстого, по глубине и охвату событий до сих пор стоящий на первом месте во всей мировой литературе, - вершина творчества великого мыслителя, как никакое другое произведение писателя отражает глубину его мироощущения и философии", "publishdate": "1869-01-01", "publisher_id": 2}	{"price": 1200.00, "title": "Война и мир", "id_book": 2, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000166531/COVER/cover1__w820.webp", "quantity": 2, "author_id": 2, "category_id": 1, "description": "\\"Война и мир\\" – роман-эпопея Льва Николаевича Толстого, по глубине и охвату событий до сих пор стоящий на первом месте во всей мировой литературе, - вершина творчества великого мыслителя, как никакое другое произведение писателя отражает глубину его мироощущения и философии", "publishdate": "1869-01-01", "publisher_id": 2}
+54	orders	24	INSERT	iv4n	2025-10-17 14:16:26.622224	\N	{"user_id": 5, "id_order": 24, "orderdate": "2025-10-17T14:16:26.622224", "status_id": 1, "address_id": 4, "deliverytype_id": 1}
+55	orders	25	INSERT	iv4n	2025-10-17 14:16:31.952097	\N	{"user_id": 5, "id_order": 25, "orderdate": "2025-10-17T14:16:31.952097", "status_id": 1, "address_id": 5, "deliverytype_id": 1}
+56	orders	26	INSERT	iv4n	2025-10-17 14:17:12.991086	\N	{"user_id": 5, "id_order": 26, "orderdate": "2025-10-17T14:17:12.991086", "status_id": 1, "address_id": 6, "deliverytype_id": 1}
+57	books	6	UPDATE	iv4n	2025-10-17 14:17:13.003245	{"price": 729.00, "title": "Дела Тайной канцелярии", "id_book": 6, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000001334346/COVER/cover1__w820.webp", "quantity": 16, "author_id": 5, "category_id": 3, "description": "Молодой колдун Афанасий Репин, служащий Тайной канцелярии, получает в услужение необычного помощника — дива Владимира, бывшего фамильяра знатного рода. Тайные преступления, магические заговоры и интриги высшего света, которые могут повлиять на судьбу империи, — всё это предстоит раскрыть колдуну и его диву. Именно Афанасий сумел увидеть во Владимире то, чего не замечали остальные: достоинство, порядочность, ум и преданность.", "publishdate": "2025-08-15", "publisher_id": 2}	{"price": 729.00, "title": "Дела Тайной канцелярии", "id_book": 6, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000001334346/COVER/cover1__w820.webp", "quantity": 15, "author_id": 5, "category_id": 3, "description": "Молодой колдун Афанасий Репин, служащий Тайной канцелярии, получает в услужение необычного помощника — дива Владимира, бывшего фамильяра знатного рода. Тайные преступления, магические заговоры и интриги высшего света, которые могут повлиять на судьбу империи, — всё это предстоит раскрыть колдуну и его диву. Именно Афанасий сумел увидеть во Владимире то, чего не замечали остальные: достоинство, порядочность, ум и преданность.", "publishdate": "2025-08-15", "publisher_id": 2}
+58	orders	27	INSERT	iv4n	2025-10-17 14:19:37.285995	\N	{"user_id": 5, "id_order": 27, "orderdate": "2025-10-17T14:19:37.285995", "status_id": 1, "address_id": null, "deliverytype_id": 2}
+82	books	1	UPDATE	aln	2025-10-20 12:45:49.771398	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.ast.ru/v2/ASE000000000830384/COVER/cover1__w410.jpg", "quantity": 7, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.ast.ru/v2/ASE000000000830384/COVER/cover1__w410.jpg", "quantity": 7, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+133	orders	17	DELETE	aln	2025-10-21 10:40:41.632454	{"user_id": 5, "id_order": 17, "orderdate": "2025-10-17T13:27:19.832263", "status_id": 3, "address_id": null, "deliverytype_id": 2}	\N
+134	orders	16	DELETE	aln	2025-10-21 10:40:47.707839	{"user_id": 3, "id_order": 16, "orderdate": "2025-10-17T10:59:56.829226", "status_id": 1, "address_id": null, "deliverytype_id": 2}	\N
+59	books	6	UPDATE	iv4n	2025-10-17 14:19:37.297164	{"price": 729.00, "title": "Дела Тайной канцелярии", "id_book": 6, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000001334346/COVER/cover1__w820.webp", "quantity": 15, "author_id": 5, "category_id": 3, "description": "Молодой колдун Афанасий Репин, служащий Тайной канцелярии, получает в услужение необычного помощника — дива Владимира, бывшего фамильяра знатного рода. Тайные преступления, магические заговоры и интриги высшего света, которые могут повлиять на судьбу империи, — всё это предстоит раскрыть колдуну и его диву. Именно Афанасий сумел увидеть во Владимире то, чего не замечали остальные: достоинство, порядочность, ум и преданность.", "publishdate": "2025-08-15", "publisher_id": 2}	{"price": 729.00, "title": "Дела Тайной канцелярии", "id_book": 6, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000001334346/COVER/cover1__w820.webp", "quantity": 14, "author_id": 5, "category_id": 3, "description": "Молодой колдун Афанасий Репин, служащий Тайной канцелярии, получает в услужение необычного помощника — дива Владимира, бывшего фамильяра знатного рода. Тайные преступления, магические заговоры и интриги высшего света, которые могут повлиять на судьбу империи, — всё это предстоит раскрыть колдуну и его диву. Именно Афанасий сумел увидеть во Владимире то, чего не замечали остальные: достоинство, порядочность, ум и преданность.", "publishdate": "2025-08-15", "publisher_id": 2}
+150	users	3	UPDATE	petroshaaaaaa	2025-10-26 17:36:12.787284	{"email": "petrov@mail.ru", "id_user": 3, "lastname": "Петров", "firstname": "Петр", "account_id": 4, "patronymic": null}	{"email": "petrov@mail.ru", "id_user": 3, "lastname": "Петров", "firstname": "Петр", "account_id": 4, "patronymic": null}
+74	orders	11	UPDATE	petroshaaaaaa	2025-10-17 16:37:15.814835	{"user_id": 3, "id_order": 11, "orderdate": "2025-10-16T17:34:43.235586", "status_id": 1, "address_id": 1, "deliverytype_id": 1}	{"user_id": 3, "id_order": 11, "orderdate": "2025-10-16T17:34:43.235586", "status_id": 3, "address_id": 1, "deliverytype_id": 1}
+75	orders	10	UPDATE	petroshaaaaaa	2025-10-17 16:37:18.625762	{"user_id": 3, "id_order": 10, "orderdate": "2025-10-16T17:33:51.245716", "status_id": 1, "address_id": 1, "deliverytype_id": 1}	{"user_id": 3, "id_order": 10, "orderdate": "2025-10-16T17:33:51.245716", "status_id": 3, "address_id": 1, "deliverytype_id": 1}
+83	books	1	UPDATE	aln	2025-10-20 12:47:34.910624	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.ast.ru/v2/ASE000000000830384/COVER/cover1__w410.jpg", "quantity": 7, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.ast.ru/v2/ASE000000000830384/COVER/cover1__w410.jpg", "quantity": 7, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+84	books	1	UPDATE	aln	2025-10-20 12:47:36.760728	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.ast.ru/v2/ASE000000000830384/COVER/cover1__w410.jpg", "quantity": 7, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.ast.ru/v2/ASE000000000830384/COVER/cover1__w410.jpg", "quantity": 7, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+135	orders	15	DELETE	aln	2025-10-21 10:40:49.873875	{"user_id": 3, "id_order": 15, "orderdate": "2025-10-17T09:58:16.058251", "status_id": 1, "address_id": null, "deliverytype_id": 2}	\N
+136	orders	18	DELETE	aln	2025-10-21 10:40:51.849019	{"user_id": 5, "id_order": 18, "orderdate": "2025-10-17T13:27:47.991613", "status_id": 1, "address_id": null, "deliverytype_id": 2}	\N
+137	orders	19	DELETE	aln	2025-10-21 10:40:53.605731	{"user_id": 5, "id_order": 19, "orderdate": "2025-10-17T13:44:24.510994", "status_id": 1, "address_id": null, "deliverytype_id": 2}	\N
+151	users	3	UPDATE	petroshaaaaaa	2025-10-26 17:36:18.680443	{"email": "petrov@mail.ru", "id_user": 3, "lastname": "Петров", "firstname": "Петр", "account_id": 4, "patronymic": null}	{"email": "petrov@mail.ru", "id_user": 3, "lastname": "Петров", "firstname": "Петр", "account_id": 4, "patronymic": null}
+97	books	1	UPDATE	aln	2025-10-20 12:51:37.716365	{"price": 351.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.ast.ru/v2/ASE000000000830384/COVER/cover1__w410.jpg", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 351.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.ast.ru/v2/ASE000000000830384/COVER/cover1__w410.jpg", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+98	books	1	UPDATE	aln	2025-10-20 12:51:55.041959	{"price": 351.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.ast.ru/v2/ASE000000000830384/COVER/cover1__w410.jpg", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 351.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.ast.ru/v2/ASE000000000830384/COVER/cover1__w410.jpg", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+99	books	1	UPDATE	aln	2025-10-20 12:52:54.480972	{"price": 351.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.ast.ru/v2/ASE000000000830384/COVER/cover1__w410.jpg", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.ast.ru/v2/ASE000000000830384/COVER/cover1__w410.jpg", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+100	books	1	UPDATE	aln	2025-10-20 14:06:36.11189	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.ast.ru/v2/ASE000000000830384/COVER/cover1__w410.jpg", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.azbooka.ru/cv/w1100/8fb16b40-17d4-43fa-b3fa-20238b342ad3.jpg", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+138	orders	3	UPDATE	aln	2025-10-21 10:42:41.738898	{"user_id": 3, "id_order": 3, "orderdate": "2025-10-16T16:24:47.542956", "status_id": 3, "address_id": 1, "deliverytype_id": 1}	{"user_id": 3, "id_order": 3, "orderdate": "2025-10-16T16:24:47.542956", "status_id": 2, "address_id": 1, "deliverytype_id": 1}
+101	books	7	INSERT	aln	2025-10-20 14:45:04.708235	\N	{"price": 339.00, "title": "Игрок", "id_book": 7, "imageurl": "https://cdn.ast.ru/v2/ASE000000000829671/COVER/cover1__w410.jpg", "quantity": 13, "author_id": 3, "category_id": 1, "description": "«Больная эгоистка. Эгоизм и самолюбие в ней колоссальны. Она требует от людей всего, всех совершенств, не прощает ни единого несовершенства в уважении других хороших черт, сама же избавляет себя от самых малейших обязанностей к людям», — так отечественный писатель Федор Достоевский обрисовывал Аполлинарию Суслову, свою возлюбленную и главный прототип роковых женщин из его текстов.\\nИх отношения были непростыми. Суслова не предавала значения глубокому внутреннему миру литератора, требовала от него развестись с больной женой. Но при этом, получив после ее кончины заветное предложение руки и сердца, ответила «нет». Нездоровая любовь нашла отражение на страницах автобиографичного романа «Игрок», который увидел свет в 1866 году.", "publishdate": "1866-01-01", "publisher_id": 1}
+102	books	5	UPDATE	aln	2025-10-20 14:45:34.199745	{"price": 800.00, "title": "Преступление и наказание", "id_book": 5, "imageurl": "https://cdn.ast.ru/v2/ASE000000000703427/COVER/cover1__w410.jpg", "quantity": 13, "author_id": 3, "category_id": 1, "description": "Шедевр мировой литературы — социально-психологический роман «Преступление и наказание» — Федор Достоевский создал в непростое для себя время. Годом ранее он потерял старшего брата и любимую жену. Затем последовали смерть друга — писателя Аполлона Григорьева, закрытие авторского журнала «Эпоха», практически полное разорение, каторжный договор на написание «Игрока», угроза тюремного срока... Достоевского спасла некогда услышанная история французского поэта-убийцы Пьера Франсуа Ласнера, которая и легла в основу сюжета культового философского произведения.", "publishdate": "1866-01-01", "publisher_id": 1}	{"price": 800.00, "title": "Преступление и наказание", "id_book": 5, "imageurl": "https://cdn.ast.ru/v2/ASE000000000703427/COVER/cover1__w410.jpg", "quantity": 17, "author_id": 3, "category_id": 1, "description": "Шедевр мировой литературы — социально-психологический роман «Преступление и наказание» — Федор Достоевский создал в непростое для себя время. Годом ранее он потерял старшего брата и любимую жену. Затем последовали смерть друга — писателя Аполлона Григорьева, закрытие авторского журнала «Эпоха», практически полное разорение, каторжный договор на написание «Игрока», угроза тюремного срока... Достоевского спасла некогда услышанная история французского поэта-убийцы Пьера Франсуа Ласнера, которая и легла в основу сюжета культового философского произведения.", "publishdate": "1866-01-01", "publisher_id": 1}
+103	books	1	UPDATE	aln	2025-10-20 21:42:45.742939	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.azbooka.ru/cv/w1100/8fb16b40-17d4-43fa-b3fa-20238b342ad3.jpg", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+104	books	1	UPDATE	aln	2025-10-20 21:43:00.233541	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+139	reviews	11	INSERT	aln	2025-10-21 11:35:59.966843	\N	{"rating": 4, "book_id": 4, "user_id": 4, "id_review": 11, "reviewdate": "2025-10-21T11:35:59.966843", "usercomment": "ммммм"}
+140	reviews	11	DELETE	aln	2025-10-21 11:36:03.281198	{"rating": 4, "book_id": 4, "user_id": 4, "id_review": 11, "reviewdate": "2025-10-21T11:35:59.966843", "usercomment": "ммммм"}	\N
+105	books	1	UPDATE	aln	2025-10-20 21:44:11.160325	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+106	books	1	UPDATE	aln	2025-10-20 21:46:32.824745	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+107	books	1	UPDATE	aln	2025-10-20 21:47:28.987148	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+108	books	1	UPDATE	aln	2025-10-20 21:49:33.925807	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 2, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+141	reviews	12	INSERT	aln	2025-10-21 14:23:47.795356	\N	{"rating": 5, "book_id": 5, "user_id": 4, "id_review": 12, "reviewdate": "2025-10-21T14:23:47.795356", "usercomment": "я родион"}
+142	reviews	12	DELETE	aln	2025-10-21 14:23:55.52093	{"rating": 5, "book_id": 5, "user_id": 4, "id_review": 12, "reviewdate": "2025-10-21T14:23:47.795356", "usercomment": "я родион"}	\N
+109	books	1	UPDATE	aln	2025-10-20 21:49:56.292354	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 2, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+110	books	1	UPDATE	aln	2025-10-20 21:52:18.324964	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 2, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+111	books	1	UPDATE	aln	2025-10-20 21:52:28.794758	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 2, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+112	books	1	UPDATE	aln	2025-10-20 21:52:41.007617	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+159	users	9	UPDATE	mitko	2025-11-11 11:48:14.963705	{"email": "mitko@mail", "id_user": 9, "lastname": "Митько", "firstname": "Василий", "account_id": 11, "patronymic": null}	{"email": "mitko@mail", "id_user": 9, "lastname": "Митько", "firstname": "Василий", "account_id": 11, "patronymic": null}
+113	books	1	UPDATE	aln	2025-10-20 21:53:49.853088	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онегf", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+114	books	1	UPDATE	aln	2025-10-20 21:54:20.536758	{"price": 350.00, "title": "Евгений Онегf", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онега", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 3, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+115	books	1	UPDATE	aln	2025-10-20 21:54:34.693589	{"price": 350.00, "title": "Евгений Онега", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 3, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онега", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 3, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+116	books	1	UPDATE	aln	2025-10-20 22:00:29.945527	{"price": 350.00, "title": "Евгений Онега", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 3, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онега", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+160	users	9	UPDATE	mitko	2025-11-11 11:48:49.505894	{"email": "mitko@mail", "id_user": 9, "lastname": "Митько", "firstname": "Василий", "account_id": 11, "patronymic": null}	{"email": "mitko@mai", "id_user": 9, "lastname": "Митько", "firstname": "Василий", "account_id": 11, "patronymic": null}
+117	books	1	UPDATE	aln	2025-10-20 22:01:07.928451	{"price": 350.00, "title": "Евгений Онега", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онега", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 1, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+118	books	1	UPDATE	aln	2025-10-20 22:01:40.688818	{"price": 350.00, "title": "Евгений Онега", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 1, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онега", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 4, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+119	books	1	UPDATE	aln	2025-10-20 22:01:52.726159	{"price": 350.00, "title": "Евгений Онега", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 4, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онега", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 1, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+120	books	1	UPDATE	aln	2025-10-20 22:02:01.225202	{"price": 350.00, "title": "Евгений Онега", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 1, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онега", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+161	users	9	UPDATE	mitko	2025-11-11 11:49:29.798724	{"email": "mitko@mai", "id_user": 9, "lastname": "Митько", "firstname": "Василий", "account_id": 11, "patronymic": null}	{"email": "mitko@mai", "id_user": 9, "lastname": "Митько", "firstname": "Василий", "account_id": 11, "patronymic": null}
+121	books	1	UPDATE	aln	2025-10-20 22:04:02.755326	{"price": 350.00, "title": "Евгений Онега", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онега", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+122	books	1	UPDATE	aln	2025-10-20 22:04:14.626818	{"price": 350.00, "title": "Евгений Онега", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онега", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 1, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+123	books	1	UPDATE	aln	2025-10-20 22:05:48.636077	{"price": 350.00, "title": "Евгений Онега", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 1, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онега", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+124	books	1	UPDATE	aln	2025-10-20 22:07:00.296785	{"price": 350.00, "title": "Евгений Онега", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онега", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 1, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+162	users	9	UPDATE	mitko	2025-11-11 11:50:39.085993	{"email": "mitko@mai", "id_user": 9, "lastname": "Митько", "firstname": "Василий", "account_id": 11, "patronymic": null}	{"email": "mitko@mail.ru", "id_user": 9, "lastname": "Митько", "firstname": "Василий", "account_id": 11, "patronymic": null}
+125	books	1	UPDATE	aln	2025-10-20 22:07:11.369764	{"price": 350.00, "title": "Евгений Онега", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 1, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онега", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+126	books	1	UPDATE	aln	2025-10-20 22:09:17.425167	{"price": 350.00, "title": "Евгений Онега", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онега", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+127	books	1	UPDATE	aln	2025-10-20 22:11:53.952748	{"price": 350.00, "title": "Евгений Онега", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онега", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+128	books	1	UPDATE	aln	2025-10-20 22:13:12.854039	{"price": 350.00, "title": "Евгений Онега", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онега", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+129	books	1	UPDATE	aln	2025-10-20 22:15:58.736605	{"price": 350.00, "title": "Евгений Онега", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}	{"price": 350.00, "title": "Евгений Онегин", "id_book": 1, "imageurl": "https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp", "quantity": 8, "author_id": 1, "category_id": 2, "description": "«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.", "publishdate": "1833-01-01", "publisher_id": 1}
+143	orders	28	INSERT	iv4n	2025-10-21 15:51:44.983087	\N	{"user_id": 5, "id_order": 28, "orderdate": "2025-10-21T15:51:44.983087", "status_id": 1, "address_id": null, "deliverytype_id": 2}
+152	accounts	9	INSERT	anonymous	2025-11-11 10:35:05.241302	\N	{"login": "митько", "role_id": 2, "id_account": 9, "hashpassword": "$2a$06$LwrMgpE2bJbluxB6XUW3ReUyJBtmHgpjEl1cJk6SU1ABPpyzWd/R6"}
+153	users	8	INSERT	anonymous	2025-11-11 10:35:05.350117	\N	{"email": "mit@xn--80a1acny.xn--p1ag", "id_user": 8, "lastname": "Митько", "firstname": "Василий", "account_id": 9, "patronymic": ""}
+154	users	8	DELETE	\N	2025-11-11 11:20:41.008461	{"email": "mit@xn--80a1acny.xn--p1ag", "id_user": 8, "lastname": "Митько", "firstname": "Василий", "account_id": 9, "patronymic": ""}	\N
+155	accounts	9	DELETE	\N	2025-11-11 11:20:41.008461	{"login": "митько", "role_id": 2, "id_account": 9, "hashpassword": "$2a$06$LwrMgpE2bJbluxB6XUW3ReUyJBtmHgpjEl1cJk6SU1ABPpyzWd/R6"}	\N
+156	accounts	11	INSERT	anonymous	2025-11-11 11:42:23.94175	\N	{"login": "mitko", "role_id": 2, "id_account": 11, "hashpassword": "$2a$06$Yb8CAxZE/z0XMP/kPANWa.ebBJnBle5xdxUKJnAjXk7nInPQMluT2"}
+157	users	9	INSERT	anonymous	2025-11-11 11:42:23.979921	\N	{"email": "mitko@xn--80a1acny", "id_user": 9, "lastname": "Митько", "firstname": "Василий", "account_id": 11, "patronymic": ""}
+144	books	5	UPDATE	iv4n	2025-10-21 15:51:45.011219	{"price": 800.00, "title": "Преступление и наказание", "id_book": 5, "imageurl": "https://cdn.ast.ru/v2/ASE000000000703427/COVER/cover1__w410.jpg", "quantity": 17, "author_id": 3, "category_id": 1, "description": "Шедевр мировой литературы — социально-психологический роман «Преступление и наказание» — Федор Достоевский создал в непростое для себя время. Годом ранее он потерял старшего брата и любимую жену. Затем последовали смерть друга — писателя Аполлона Григорьева, закрытие авторского журнала «Эпоха», практически полное разорение, каторжный договор на написание «Игрока», угроза тюремного срока... Достоевского спасла некогда услышанная история французского поэта-убийцы Пьера Франсуа Ласнера, которая и легла в основу сюжета культового философского произведения.", "publishdate": "1866-01-01", "publisher_id": 1}	{"price": 800.00, "title": "Преступление и наказание", "id_book": 5, "imageurl": "https://cdn.ast.ru/v2/ASE000000000703427/COVER/cover1__w410.jpg", "quantity": 16, "author_id": 3, "category_id": 1, "description": "Шедевр мировой литературы — социально-психологический роман «Преступление и наказание» — Федор Достоевский создал в непростое для себя время. Годом ранее он потерял старшего брата и любимую жену. Затем последовали смерть друга — писателя Аполлона Григорьева, закрытие авторского журнала «Эпоха», практически полное разорение, каторжный договор на написание «Игрока», угроза тюремного срока... Достоевского спасла некогда услышанная история французского поэта-убийцы Пьера Франсуа Ласнера, которая и легла в основу сюжета культового философского произведения.", "publishdate": "1866-01-01", "publisher_id": 1}
+\.
+
+
+--
+-- Data for Name: authors; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.authors (id_author, lastname, firstname, patronymic, birthdate, deathdate) FROM stdin;
+1	Пушкин	Александр	Сергеевич	1799-06-06	1837-01-29
+2	Толстой	Лев	Николаевич	1828-09-09	1910-11-20
+3	Достоевский	Фёдор	Михайлович	1821-11-11	1881-02-09
+4	Волков	Александр	Мелентьевич	1891-06-14	1977-07-03
+5	Дашкевич	Виктор	\N	1978-07-17	\N
+6	Кинг	Стивен	\N	1947-09-21	\N
+\.
+
+
+--
+-- Data for Name: books; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.books (id_book, title, description, publishdate, author_id, publisher_id, category_id, price, quantity, imageurl) FROM stdin;
+6	Дела Тайной канцелярии	Молодой колдун Афанасий Репин, служащий Тайной канцелярии, получает в услужение необычного помощника — дива Владимира, бывшего фамильяра знатного рода. Тайные преступления, магические заговоры и интриги высшего света, которые могут повлиять на судьбу империи, — всё это предстоит раскрыть колдуну и его диву. Именно Афанасий сумел увидеть во Владимире то, чего не замечали остальные: достоинство, порядочность, ум и преданность.	2025-08-15	5	2	3	729.00	14	https://cdn.eksmo.ru/v2/ITD000000001334346/COVER/cover1__w820.webp
+7	Игрок	«Больная эгоистка. Эгоизм и самолюбие в ней колоссальны. Она требует от людей всего, всех совершенств, не прощает ни единого несовершенства в уважении других хороших черт, сама же избавляет себя от самых малейших обязанностей к людям», — так отечественный писатель Федор Достоевский обрисовывал Аполлинарию Суслову, свою возлюбленную и главный прототип роковых женщин из его текстов.\nИх отношения были непростыми. Суслова не предавала значения глубокому внутреннему миру литератора, требовала от него развестись с больной женой. Но при этом, получив после ее кончины заветное предложение руки и сердца, ответила «нет». Нездоровая любовь нашла отражение на страницах автобиографичного романа «Игрок», который увидел свет в 1866 году.	1866-01-01	3	1	1	339.00	13	https://cdn.ast.ru/v2/ASE000000000829671/COVER/cover1__w410.jpg
+2	Война и мир	"Война и мир" – роман-эпопея Льва Николаевича Толстого, по глубине и охвату событий до сих пор стоящий на первом месте во всей мировой литературе, - вершина творчества великого мыслителя, как никакое другое произведение писателя отражает глубину его мироощущения и философии	1869-01-01	2	2	1	1200.00	5	https://cdn.eksmo.ru/v2/ITD000000000166531/COVER/cover1__w820.webp
+4	Волшебник изумрудного города	Сказочная повесть «Волшебник Изумрудного города» является переработкой сказки американского писателя Ф. Баума. Она рассказывает об удивительных приключениях девочки Элли и ее друзей в Волшебной стране.	\N	4	1	4	1499.00	1	https://cdn.ast.ru/v2/AST000000000153536/COVER/cover1__w410.jpg
+1	Евгений Онегин	«Евгений Онегин» — первый роман в стихах, написанный на русском языке. Он стал важной вехой в истории отечественной литературы. «Энциклопедия русской жизни» — так охарактеризовал это произведение критик Виссарион Белинский. В «Евгении Онегине» Александр Пушкин представил читателям галерею ярких героев, характеры которых прочно укоренились в русской литературе. Этот роман повлиял на творчество таких выдающихся отечественных авторов, как Михаил Лермонтов, Николай Чернышевский, Борис Пастернак и Владимир Набоков.	1833-01-01	1	1	2	350.00	8	https://cdn.eksmo.ru/v2/ITD000000000829984/COVER/cover1__w820.webp
+5	Преступление и наказание	Шедевр мировой литературы — социально-психологический роман «Преступление и наказание» — Федор Достоевский создал в непростое для себя время. Годом ранее он потерял старшего брата и любимую жену. Затем последовали смерть друга — писателя Аполлона Григорьева, закрытие авторского журнала «Эпоха», практически полное разорение, каторжный договор на написание «Игрока», угроза тюремного срока... Достоевского спасла некогда услышанная история французского поэта-убийцы Пьера Франсуа Ласнера, которая и легла в основу сюжета культового философского произведения.	1866-01-01	3	1	1	800.00	16	https://cdn.ast.ru/v2/ASE000000000703427/COVER/cover1__w410.jpg
+8	Капитанская дочка	Повествование ведется от лица главного героя – потомственного дворянина Петра Андреевича Гринёва, который спустя много лет описывает в своем дневнике события давних времен. Он рассказывает о своем детстве, о том как на семнадцатом году отец послал его на службу в Оренбург, а оттуда молодого барина отправили в еще большую глушь – Белогорскую крепость. Командовал белогорским гарнизоном капитан Иван Кузьмич Миронов, и у него была дочь Маша…	\N	1	1	4	300.00	15	https://cdn.ast.ru/v2/ASE000000000864873/COVER/cover1__w410.jpg
+\.
+
+
+--
+-- Data for Name: categories; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.categories (id_category, name) FROM stdin;
+2	Поэзия
+3	Фантастика
+4	Повесть
+1	Роман
+5	Психология
+\.
+
+
+--
+-- Data for Name: deliverytypes; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.deliverytypes (id_deliverytype, typename) FROM stdin;
+1	Курьер
+2	Самовывоз
+\.
+
+
+--
+-- Data for Name: orderdetails; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.orderdetails (id_orderdetail, order_id, price, quantity, book_id) FROM stdin;
+4	3	1200.00	2	2
+5	4	1499.00	1	4
+13	12	350.00	2	1
+14	13	1200.00	1	2
+15	14	800.00	1	5
+26	23	800.00	1	5
+29	26	729.00	1	6
+30	27	729.00	1	6
+31	28	800.00	1	5
+\.
+
+
+--
+-- Data for Name: orders; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.orders (id_order, orderdate, user_id, status_id, deliverytype_id, address_id) FROM stdin;
+4	2025-10-16 16:28:37.642526	3	1	1	1
+9	2025-10-16 17:33:00.523003	3	1	1	1
+12	2025-10-16 17:38:32.487372	3	1	1	1
+14	2025-10-16 18:43:07.034616	3	1	1	1
+23	2025-10-17 14:11:10.17376	5	1	1	3
+25	2025-10-17 14:16:31.952097	5	1	1	5
+26	2025-10-17 14:17:12.991086	5	1	1	6
+13	2025-10-16 17:40:35.529984	3	3	1	1
+11	2025-10-16 17:34:43.235586	3	3	1	1
+10	2025-10-16 17:33:51.245716	3	3	1	1
+3	2025-10-16 16:24:47.542956	3	2	1	1
+28	2025-10-21 15:51:44.983087	5	1	2	\N
+27	2025-10-17 14:19:37.285995	5	2	2	\N
+\.
+
+
+--
+-- Data for Name: publishers; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.publishers (id_publisher, legalname, contactnum, email, address_id) FROM stdin;
+4	Астрель-СПб	88123323180	astrelspb@mail.ru	7
+1	Издательство АСТ	84951234567	contact@ast.ru	8
+2	Эксмо	84959876543	info@eksmo.ru	9
+5	Lumière Éditions	41456729981	contact@lumiere.fr	10
+\.
+
+
+--
+-- Data for Name: reviews; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.reviews (id_review, user_id, book_id, rating, usercomment, reviewdate) FROM stdin;
+7	3	4	5	читал эту книгу в детстве	2025-10-16 14:14:20.039473
+10	5	2	2	мне не зашло	2025-10-17 15:23:48.685532
+\.
+
+
+--
+-- Data for Name: roles; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.roles (id_role, rolename) FROM stdin;
+1	Администратор
+2	Покупатель
+\.
+
+
+--
+-- Data for Name: statuses; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.statuses (id_status, status) FROM stdin;
+1	Новый
+3	Отменён
+2	Доставлен
+\.
+
+
+--
+-- Data for Name: users; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.users (id_user, lastname, firstname, patronymic, email, account_id) FROM stdin;
+5	Иванов	Иван	\N	ivan@mail.ru	6
+4	Гладкова	Алёна	Александровна	isip_a.a.gladkova@mpt.ru	5
+3	Петров	Петр	\N	petrov@mail.ru	4
+9	Митько	Василий	\N	mitko@mail.ru	11
+\.
+
+
+--
+-- Name: accounts_id_account_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.accounts_id_account_seq', 11, true);
+
+
+--
+-- Name: addresses_id_address_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.addresses_id_address_seq', 10, true);
+
+
+--
+-- Name: auditlog_id_audit_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.auditlog_id_audit_seq', 162, true);
+
+
+--
+-- Name: authors_id_author_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.authors_id_author_seq', 6, true);
+
+
+--
+-- Name: books_id_book_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.books_id_book_seq', 8, true);
+
+
+--
+-- Name: categories_id_category_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.categories_id_category_seq', 5, true);
+
+
+--
+-- Name: deliverytypes_id_deliverytype_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.deliverytypes_id_deliverytype_seq', 3, true);
+
+
+--
+-- Name: orderdetails_id_orderdetail_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.orderdetails_id_orderdetail_seq', 31, true);
+
+
+--
+-- Name: orders_id_order_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.orders_id_order_seq', 28, true);
+
+
+--
+-- Name: publishers_id_publisher_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.publishers_id_publisher_seq', 5, true);
+
+
+--
+-- Name: reviews_id_review_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.reviews_id_review_seq', 13, true);
+
+
+--
+-- Name: roles_id_role_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.roles_id_role_seq', 2, true);
+
+
+--
+-- Name: statuses_id_status_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.statuses_id_status_seq', 4, true);
+
+
+--
+-- Name: users_id_user_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.users_id_user_seq', 9, true);
+
+
+--
+-- Name: accounts accounts_hashpassword_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.accounts
+    ADD CONSTRAINT accounts_hashpassword_key UNIQUE (hashpassword);
+
+
+--
+-- Name: accounts accounts_login_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.accounts
+    ADD CONSTRAINT accounts_login_key UNIQUE (login);
+
+
+--
+-- Name: accounts accounts_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.accounts
+    ADD CONSTRAINT accounts_pkey PRIMARY KEY (id_account);
+
+
+--
+-- Name: addresses addresses_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.addresses
+    ADD CONSTRAINT addresses_pkey PRIMARY KEY (id_address);
+
+
+--
+-- Name: auditlog auditlog_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.auditlog
+    ADD CONSTRAINT auditlog_pkey PRIMARY KEY (id_audit);
+
+
+--
+-- Name: authors authors_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.authors
+    ADD CONSTRAINT authors_pkey PRIMARY KEY (id_author);
+
+
+--
+-- Name: books books_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.books
+    ADD CONSTRAINT books_pkey PRIMARY KEY (id_book);
+
+
+--
+-- Name: categories categories_name_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.categories
+    ADD CONSTRAINT categories_name_key UNIQUE (name);
+
+
+--
+-- Name: categories categories_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.categories
+    ADD CONSTRAINT categories_pkey PRIMARY KEY (id_category);
+
+
+--
+-- Name: deliverytypes deliverytypes_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.deliverytypes
+    ADD CONSTRAINT deliverytypes_pkey PRIMARY KEY (id_deliverytype);
+
+
+--
+-- Name: deliverytypes deliverytypes_typename_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.deliverytypes
+    ADD CONSTRAINT deliverytypes_typename_key UNIQUE (typename);
+
+
+--
+-- Name: orderdetails orderdetails_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.orderdetails
+    ADD CONSTRAINT orderdetails_pkey PRIMARY KEY (id_orderdetail);
+
+
+--
+-- Name: orders orders_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.orders
+    ADD CONSTRAINT orders_pkey PRIMARY KEY (id_order);
+
+
+--
+-- Name: publishers publishers_address_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.publishers
+    ADD CONSTRAINT publishers_address_id_key UNIQUE (address_id);
+
+
+--
+-- Name: publishers publishers_contactnum_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.publishers
+    ADD CONSTRAINT publishers_contactnum_key UNIQUE (contactnum);
+
+
+--
+-- Name: publishers publishers_email_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.publishers
+    ADD CONSTRAINT publishers_email_key UNIQUE (email);
+
+
+--
+-- Name: publishers publishers_legalname_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.publishers
+    ADD CONSTRAINT publishers_legalname_key UNIQUE (legalname);
+
+
+--
+-- Name: publishers publishers_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.publishers
+    ADD CONSTRAINT publishers_pkey PRIMARY KEY (id_publisher);
+
+
+--
+-- Name: reviews reviews_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.reviews
+    ADD CONSTRAINT reviews_pkey PRIMARY KEY (id_review);
+
+
+--
+-- Name: roles roles_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.roles
+    ADD CONSTRAINT roles_pkey PRIMARY KEY (id_role);
+
+
+--
+-- Name: roles roles_rolename_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.roles
+    ADD CONSTRAINT roles_rolename_key UNIQUE (rolename);
+
+
+--
+-- Name: statuses statuses_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.statuses
+    ADD CONSTRAINT statuses_pkey PRIMARY KEY (id_status);
+
+
+--
+-- Name: statuses statuses_status_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.statuses
+    ADD CONSTRAINT statuses_status_key UNIQUE (status);
+
+
+--
+-- Name: users users_account_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_account_id_key UNIQUE (account_id);
+
+
+--
+-- Name: users users_email_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_email_key UNIQUE (email);
+
+
+--
+-- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_pkey PRIMARY KEY (id_user);
+
+
+--
+-- Name: accounts trg_accounts_audit; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_accounts_audit AFTER INSERT OR DELETE OR UPDATE ON public.accounts FOR EACH ROW EXECUTE FUNCTION public.log_changes();
+
+
+--
+-- Name: books trg_books_audit; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_books_audit AFTER INSERT OR DELETE OR UPDATE ON public.books FOR EACH ROW EXECUTE FUNCTION public.log_changes();
+
+
+--
+-- Name: users trg_check_email; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_check_email BEFORE INSERT OR UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION public.check_email_trigger();
+
+
+--
+-- Name: publishers trg_check_publisher_phone; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_check_publisher_phone BEFORE INSERT OR UPDATE ON public.publishers FOR EACH ROW EXECUTE FUNCTION public.check_publisher_phone();
+
+
+--
+-- Name: orders trg_orders_audit; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_orders_audit AFTER INSERT OR DELETE OR UPDATE ON public.orders FOR EACH ROW EXECUTE FUNCTION public.log_changes();
+
+
+--
+-- Name: orderdetails trg_reduce_book_quantity; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_reduce_book_quantity AFTER INSERT ON public.orderdetails FOR EACH ROW EXECUTE FUNCTION public.reduce_book_quantity();
+
+
+--
+-- Name: orders trg_restore_books_on_cancel; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_restore_books_on_cancel AFTER UPDATE ON public.orders FOR EACH ROW EXECUTE FUNCTION public.restore_books_on_cancel();
+
+
+--
+-- Name: reviews trg_reviews_audit; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_reviews_audit AFTER INSERT OR DELETE OR UPDATE ON public.reviews FOR EACH ROW EXECUTE FUNCTION public.log_changes();
+
+
+--
+-- Name: orders trg_set_default_order_status; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_set_default_order_status BEFORE INSERT ON public.orders FOR EACH ROW EXECUTE FUNCTION public.set_default_order_status();
+
+
+--
+-- Name: users trg_users_audit; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_users_audit AFTER INSERT OR DELETE OR UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION public.log_changes();
+
+
+--
+-- Name: accounts accounts_role_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.accounts
+    ADD CONSTRAINT accounts_role_id_fkey FOREIGN KEY (role_id) REFERENCES public.roles(id_role);
+
+
+--
+-- Name: books books_author_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.books
+    ADD CONSTRAINT books_author_id_fkey FOREIGN KEY (author_id) REFERENCES public.authors(id_author);
+
+
+--
+-- Name: books books_category_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.books
+    ADD CONSTRAINT books_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.categories(id_category);
+
+
+--
+-- Name: books books_publisher_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.books
+    ADD CONSTRAINT books_publisher_id_fkey FOREIGN KEY (publisher_id) REFERENCES public.publishers(id_publisher);
+
+
+--
+-- Name: orderdetails orderdetails_book_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.orderdetails
+    ADD CONSTRAINT orderdetails_book_id_fkey FOREIGN KEY (book_id) REFERENCES public.books(id_book);
+
+
+--
+-- Name: orderdetails orderdetails_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.orderdetails
+    ADD CONSTRAINT orderdetails_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id_order);
+
+
+--
+-- Name: orders orders_address_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.orders
+    ADD CONSTRAINT orders_address_id_fkey FOREIGN KEY (address_id) REFERENCES public.addresses(id_address);
+
+
+--
+-- Name: orders orders_deliverytype_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.orders
+    ADD CONSTRAINT orders_deliverytype_id_fkey FOREIGN KEY (deliverytype_id) REFERENCES public.deliverytypes(id_deliverytype);
+
+
+--
+-- Name: orders orders_status_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.orders
+    ADD CONSTRAINT orders_status_id_fkey FOREIGN KEY (status_id) REFERENCES public.statuses(id_status);
+
+
+--
+-- Name: orders orders_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.orders
+    ADD CONSTRAINT orders_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id_user);
+
+
+--
+-- Name: publishers publishers_address_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.publishers
+    ADD CONSTRAINT publishers_address_id_fkey FOREIGN KEY (address_id) REFERENCES public.addresses(id_address);
+
+
+--
+-- Name: reviews reviews_book_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.reviews
+    ADD CONSTRAINT reviews_book_id_fkey FOREIGN KEY (book_id) REFERENCES public.books(id_book);
+
+
+--
+-- Name: reviews reviews_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.reviews
+    ADD CONSTRAINT reviews_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id_user);
+
+
+--
+-- Name: users users_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_account_id_fkey FOREIGN KEY (account_id) REFERENCES public.accounts(id_account);
+
+
+--
+-- PostgreSQL database dump complete
+--
+
