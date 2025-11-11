@@ -1,0 +1,76 @@
+config:
+  target: "http://localhost:5000"
+  phases:
+    - duration: 60   
+      arrivalRate: 10
+      name: warmup
+    - duration: 180  
+      arrivalRate: 25
+      rampTo: 75
+      name: ramp
+    - duration: 300  
+      arrivalRate: 75
+      name: sustain
+  defaults:
+    headers:
+      X-User-Login: "loadtest"  
+scenarios:
+  - name: "Книги"
+    flow:
+      - get:
+          url: "/api/books"
+
+  - name: "Авторы"
+    flow:
+      - get:
+          url: "/api/authors"
+
+  - name: "Категории"
+    flow:
+      - get:
+          url: "/api/categories"
+
+  - name: "Издатели"
+    flow:
+      - get:
+          url: "/api/publishers"
+
+  - name: "Статусы"
+    flow:
+      - get:
+          url: "/api/statuses"
+
+  - name: "Роли"
+    flow:
+      - get:
+          url: "/api/roles"
+
+  - name: "Типы доставки"
+    flow:
+      - get:
+          url: "/api/deliverytypes"
+
+  - name: "Пользователи"
+    flow:
+      - get:
+          url: "/api/users"
+
+  - name: "Адреса"
+    flow:
+      - get:
+          url: "/api/addresses"
+
+  - name: "Аккаунты"
+    flow:
+      - get:
+          url: "/api/accounts"
+
+  - name: "Заказы"
+    flow:
+      - get:
+          url: "/api/orders"
+
+  - name: "Отзывы"
+    flow:
+      - get:
+          url: "/api/reviews"
