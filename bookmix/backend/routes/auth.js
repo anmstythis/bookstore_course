@@ -11,6 +11,13 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'Не указана роль пользователя' });
     }
 
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_\-+=.,?])[A-Za-z\d!@#$%^&*()_\-+=.,?]{8,}$/;
+    if (!passwordRegex.test(password)) {
+      return res.status(400).json({
+        error: 'Пароль должен содержать минимум 8 символов, включать заглавные и строчные латинские буквы, хотя бы одну цифру и один спецсимвол',
+      });
+    }
+
     const existing = await pool.query('SELECT id_account FROM accounts WHERE login = $1', [login]);
     if (existing.rows.length > 0) {
       return res.status(400).json({ error: 'Такой логин уже существует' });

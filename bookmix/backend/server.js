@@ -23,9 +23,13 @@ import auditRouter from './routes/auditLog.js';
 
 import backup from './backup/backup.js'
 
+import {register, updateCustomMetrics, metricsMiddleware} from './metrics.js';
+
 
 const app = express();
 app.use(express.json());
+
+app.use(metricsMiddleware);
 
 app.use(cors());
 
@@ -60,6 +64,24 @@ app.use('/api/reports', reportsViews);
 app.use('/api/audit', auditRouter);
 
 app.use('/api/backup', backup);
+
+app.get('/metrics', async (req, res) => {
+    try {
+        res.set('Content-Type', register.contentType);
+        res.end(await register.metrics());
+    } catch (error) {
+        res.status(500).end('Ошибка генерации метрик!');
+    }
+});
+
+app.get('/metrics/update', async (req, res) => {
+    try {
+        await updateCustomMetrics();
+        res.json({ message: 'Метрики успешно обновлены!' });
+    } catch (error) {
+        res.status(500).json({ error: 'Ошибка обновления метрик!' });
+    }
+});
 
 // запуск сервера
 const PORT = process.env.PORT || 5000;

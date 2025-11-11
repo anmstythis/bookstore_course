@@ -48,6 +48,12 @@ router.patch('/:id', async (req, res) => {
       values.push(req.body.login);
     }
     if (req.body.password) {
+      const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_\-+=.,?])[A-Za-z\d!@#$%^&*()_\-+=.,?]{8,}$/;
+      if (!passwordRegex.test(req.body.password)) {
+        return res.status(400).json({
+          error: 'Пароль должен содержать минимум 8 символов, включать заглавные и строчные латинские буквы, хотя бы одну цифру и один спецсимвол',
+        });
+      }
       fields.push(`hashpassword = crypt($${index++}, gen_salt('bf'))`);
       values.push(req.body.password);
     }

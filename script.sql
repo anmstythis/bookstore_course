@@ -27,6 +27,10 @@ CREATE TABLE Accounts (
 	Role_ID INT REFERENCES Roles(ID_Role) NOT NULL
 );
 
+ALTER TABLE Accounts
+ADD CHECK (Login ~ '^[A-Za-z0-9_]{3,}$');
+
+
 -- Пользователи
 CREATE TABLE Users (
     ID_User SERIAL PRIMARY KEY,
@@ -489,8 +493,8 @@ EXECUTE FUNCTION set_default_order_status();
 CREATE OR REPLACE FUNCTION check_email_trigger()
 RETURNS TRIGGER AS $$
 BEGIN
-    IF NEW.email NOT LIKE '%@%' THEN
-        RAISE EXCEPTION 'Некорректный email: должен содержать символ @';
+    IF NEW.email !~ '^[A-Za-z0-9._%-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$' THEN
+        RAISE EXCEPTION 'Некорректный email: должен содержать только латиницу и иметь формат имя@домен.зона';
     END IF;
     RETURN NEW;
 END;
@@ -523,16 +527,6 @@ CREATE TRIGGER trg_restore_books_on_cancel
 AFTER UPDATE ON Orders
 FOR EACH ROW
 EXECUTE FUNCTION restore_books_on_cancel();
-
-
---ПРОВЕРКА ТРИГГЕРОВ
-UPDATE Users
-SET Email = 'mail.com'
-WHERE id_user = 1; --проверка email
-
-UPDATE Publishers 
-SET ContactNum = '8q95h234K67'
-WHERE id_publisher = 1; --проверка номера телефона
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
