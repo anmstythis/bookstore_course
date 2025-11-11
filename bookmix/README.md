@@ -1,70 +1,56 @@
-# Getting Started with Create React App
+## BookMix
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Краткая карта проекта с назначением основных директорий и файлов.
 
-## Available Scripts
+### Корень репозитория
+- `backend/`: серверная часть (Node.js + Express), REST API, БД, тесты.
+- `frontend/`: клиентская часть (React), пользовательский интерфейс.
+- `docker-compose.yaml`: состав сервисов для контейнеризации (если используется).
+- `README.md`: описание проекта и структуры (этот файл).
 
-In the project directory, you can run:
+### Backend (`backend/`)
+- `server.js`: точка входа HTTP‑сервера; подключение middleware и маршрутов.
+- `routes/`: обработчики REST‑эндпоинтов по доменам:
+  - `auth.js`: аутентификация (логин/регистрация/токены).
+  - `users.js`: пользователи и их данные.
+  - `accounts.js`: аккаунты/профили.
+  - `books.js`, `authors.js`, `categories.js`, `publishers.js`: каталог книг и справочники.
+  - `orders.js`, `deliverytypes.js`, `statuses.js`: заказы, типы доставки, статусы.
+  - `reviews.js`: отзывы.
+  - `roles.js`: роли/права доступа.
+  - `auditLog.js`: аудит действий.
+  - `reports.js`: отчеты и агрегированная аналитика.
+- `db.js`: подключение к базе данных (пул соединений).
+- `swagger.js`: описание/экспорт Swagger/OpenAPI для документации API.
+- `metrics.js`: метрики/health‑checks (если задействованы).
+- `uploads/`: хранилище загруженных файлов (например, обложек).
+- `backup/`: утилиты и дампы для резервного копирования (`backup.js`, `bookmix_backup.sql`).
+- `test/`: автотесты (Vitest) для роутов и утилит.
+  - `test/utils/createApp.js`: конструктор тестового приложения.
+  - `test/routes/*.test.js`: тесты API по разделам.
+- `Dockerfile`: контейнер для бэкенда.
+- `package.json`: зависимости и npm‑скрипты бэкенда.
+- `vitest.config.js`: конфигурация тестов.
 
-### `npm start`
+### Frontend (`frontend/`)
+- `src/`: исходники React‑приложения.
+  - `pages/`: страницы (каталог, карточка товара, корзина, заказы, логин/регистрация и т. п.).
+  - `components/`: переиспользуемые компоненты (формы, карточки, списки, хедер/футер и др.).
+  - `utils/`: утилиты работы с данными (книги, корзина, избранное, отзывы, пользователь).
+  - `axiosSetup.js`: базовая настройка HTTP‑клиента (базовый URL, интерсепторы).
+  - `App.js`, `index.js`: корневые компоненты и инициализация приложения.
+  - `App.css`, `index.css`: стили.
+- `public/`: статические файлы и манифест PWA.
+- `Dockerfile`: контейнер для фронтенда.
+- `package.json`: зависимости и npm‑скрипты фронтенда.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+### Поток данных (в общем виде)
+1. Клиент (`frontend`) отправляет запросы к REST API через `axiosSetup.js`.
+2. Сервер (`backend/server.js`) маршрутизирует запросы в соответствующие файлы `routes/*`.
+3. Роуты обращаются к базе данных через `db.js` и возвращают JSON‑ответ.
+4. Тесты (`test/routes/*.test.js`) проверяют корректность основных сценариев API.
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
-
-### `npm test`
-
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
-
-### `npm run build`
-
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
-
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
-
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
-
-### `npm run eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
-
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+### Примечания
+- Документация API формируется через `swagger.js` (конкретный путь зависит от конфигурации).
+- Каталог `uploads/` предназначен для загружаемых файлов и обычно исключается из VCS.
+- Каталог `backup/` хранит скрипты и дампы для восстановления/миграций базы.
